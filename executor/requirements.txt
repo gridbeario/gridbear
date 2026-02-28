@@ -1,4 +1,4 @@
-fastapi==0.132.0
+fastapi==0.134.0
 uvicorn==0.41.0
 docker==7.1.0
 aiosqlite==0.22.1
