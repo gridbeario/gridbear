@@ -231,7 +231,7 @@ async def auth_status(_auth: None = Depends(verify_internal_auth)):
     """Check Claude CLI authentication status."""
     from plugins.claude.runner import get_auth_error_info
 
-    status = {"loggedIn": False}
+    status: dict[str, object] = {"loggedIn": False}
     try:
         proc = await asyncio.create_subprocess_exec(
             "claude",

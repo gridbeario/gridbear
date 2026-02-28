@@ -319,7 +319,7 @@ class ClaudeApiBackend:
                     "Transient Claude API error (attempt %d): %s", attempt + 1, e
                 )
 
-        raise last_error  # pragma: no cover
+        raise RuntimeError("max retries exceeded")  # pragma: no cover
 
     async def _call_unary(
         self,
