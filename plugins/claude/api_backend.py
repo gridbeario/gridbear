@@ -312,7 +312,6 @@ class ClaudeApiBackend:
                 else:
                     return await self._call_unary(model, messages, system, tools)
             except Exception as e:
-                last_error = e
                 if not self._is_transient_error(e) or attempt >= self.max_retries:
                     raise
                 logger.warning(
