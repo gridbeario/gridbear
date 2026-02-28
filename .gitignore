@@ -84,6 +84,7 @@ docker-compose.override.yml
 !CONTRIBUTING.md
 !SECURITY.md
 !CODE_OF_CONDUCT.md
+!CHANGELOG.md
 !LICENSE
 !plugins/*/skills/*.md
 *.txt
