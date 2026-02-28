@@ -291,8 +291,6 @@ class ClaudeApiBackend:
         Returns (text, response_message).
         Retries on transient errors with exponential backoff.
         """
-        last_error = None
-
         for attempt in range(1 + self.max_retries):
             if attempt > 0:
                 delay = 2**attempt
