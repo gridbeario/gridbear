@@ -15,8 +15,12 @@ import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+
+# Active processing tasks: key -> asyncio.Task
+# Key format: "{username}:{conversation_id}" or "{username}:default"
+_active_processing: dict[str, asyncio.Task] = {}
 
 from config.logging_config import logger
 from core.api_schemas import ApiResponse, api_error, api_ok
@@ -188,7 +192,17 @@ async def chat(
         finally:
             await event_queue.put(None)
 
-    asyncio.create_task(process())
+    task = asyncio.create_task(process())
+
+    # Track task for abort support
+    conv_id = ch_meta.get("conversation_id", "default")
+    task_key = f"{request.username}:{conv_id}"
+    _active_processing[task_key] = task
+
+    def _cleanup(t):
+        _active_processing.pop(task_key, None)
+
+    task.add_done_callback(_cleanup)
 
     async def event_stream():
         while True:
@@ -200,10 +214,24 @@ async def chat(
     return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
 
-class RLMQueryRequest(BaseModel):
-    prompt: str
-    model: str = ""
-    runner: str = ""
+@router.post("/chat/abort")
+async def abort_chat(
+    request: Request,
+    _auth: None = Depends(verify_internal_auth),
+):
+    """Abort an active chat processing task."""
+    body = await request.json()
+    username = body.get("username", "")
+    conversation_id = body.get("conversation_id", "default")
+
+    task_key = f"{username}:{conversation_id}"
+    task = _active_processing.pop(task_key, None)
+    if task and not task.done():
+        task.cancel()
+        logger.info(f"Internal API: aborted chat task {task_key}")
+        return JSONResponse({"ok": True, "aborted": True})
+
+    return JSONResponse({"ok": True, "aborted": False})
 
 
 class SendFileRequest(BaseModel):
@@ -219,49 +247,6 @@ class SendMessageRequest(BaseModel):
     platform: str
     chat_id: str
     text: str
-
-
-@router.post(
-    "/rlm-query",
-    response_model=ApiResponse[dict],
-    response_model_exclude_none=True,
-)
-async def rlm_query(
-    request: RLMQueryRequest,
-    _auth: None = Depends(verify_internal_auth),
-):
-    """Simple prompt->answer for RLM sub-LM calls (no tools, no session)."""
-    plugin_manager = get_plugin_manager()
-    if not plugin_manager:
-        return api_error(503, "GridBear not initialized", "unavailable")
-
-    runner = plugin_manager.get_runner(request.runner or None)
-    if not runner:
-        return api_error(503, "no runner available", "unavailable")
-
-    try:
-        result = await asyncio.wait_for(
-            runner.run(
-                prompt=request.prompt,
-                no_tools=True,
-                use_pool=False,
-                model=request.model or None,
-            ),
-            timeout=900.0,
-        )
-        return api_ok(
-            data={
-                "text": result.text,
-                "cost_usd": result.cost_usd,
-                "is_error": result.is_error,
-            }
-        )
-    except asyncio.TimeoutError:
-        logger.error("RLM query timed out")
-        return api_error(504, "timeout", "timeout")
-    except Exception as e:
-        logger.error(f"RLM query error: {e}", exc_info=True)
-        return api_error(500, str(e), "internal_error")
 
 
 @router.post(
