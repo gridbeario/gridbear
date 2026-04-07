@@ -183,6 +183,12 @@
                                   class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-nordic-500 text-white text-[8px] flex items-center justify-center"
                                   x-text="conversationDocs.length"></span>
                         </button>
+                        <button x-show="conv.has_plan || (conv.id === activeConversationId && currentPlan)"
+                                @click.stop="selectConversation(conv); loadPlan(); planPanelOpen = !planPanelOpen"
+                                class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
+                                title="{{ _("Plan") }}">
+                            <i class="fas fa-list-check text-xs"></i>
+                        </button>
                         <button @click.stop="renameConversation(conv)"
                                 class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
                                 title="{{ _("Rename") }}">
@@ -360,6 +366,134 @@
                         </template>
                     </div>
                 </div>
+                <!-- Plan panel -->
+                <div x-show="planPanelOpen && currentPlan" x-transition
+                     class="mb-2 p-3 rounded-xl border border-void-200 dark:border-void-800 bg-white/50 dark:bg-void-900/30">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-medium text-void-500" x-text="currentPlan ? currentPlan.title : ''"></span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded-full"
+                                  :class="currentPlan ? planStatusBadge(currentPlan.status) : ''"
+                                  x-text="currentPlan ? currentPlan.status : ''"></span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <template x-if="currentPlan && currentPlan.status === 'draft'">
+                                <button @click="executePlan()" class="px-2 py-0.5 rounded-lg bg-nordic-500 hover:bg-nordic-600 text-white text-[10px] font-medium transition-colors">
+                                    <i class="fas fa-play mr-1"></i>{{ _("Execute") }}
+                                </button>
+                            </template>
+                            <template x-if="currentPlan && currentPlan.status === 'active'">
+                                <button @click="pausePlan()" class="px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-600 text-[10px] font-medium transition-colors">
+                                    <i class="fas fa-pause mr-1"></i>{{ _("Pause") }}
+                                </button>
+                            </template>
+                            <template x-if="currentPlan && currentPlan.status === 'paused'">
+                                <button @click="resumePlan()" class="px-2 py-0.5 rounded-lg bg-nordic-500/20 hover:bg-nordic-500/30 text-nordic-600 text-[10px] font-medium transition-colors">
+                                    <i class="fas fa-play mr-1"></i>{{ _("Resume") }}
+                                </button>
+                            </template>
+                            <template x-if="currentPlan && currentPlan.status !== 'completed' && currentPlan.status !== 'cancelled'">
+                                <button @click="if(confirm('{{ _("Cancel this plan?") }}')) cancelPlan()"
+                                        class="px-2 py-0.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] transition-colors"
+                                        title="{{ _('Cancel plan') }}">
+                                    <i class="fas fa-trash-can mr-1"></i>{{ _("Cancel") }}
+                                </button>
+                            </template>
+                            <button @click="planPanelOpen = false"
+                                    class="p-1 rounded-lg hover:bg-void-100 dark:hover:bg-void-800/50 text-void-400 hover:text-void-600 transition-all"
+                                    title="{{ _('Close panel') }}">
+                                <i class="fas fa-chevron-up text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="space-y-1 max-h-60 overflow-y-auto">
+                        <template x-for="(task, taskIdx) in (currentPlan ? currentPlan.tasks : [])" :key="task.id">
+                            <div class="flex items-start gap-2 py-1 px-2 rounded-lg hover:bg-void-50 dark:hover:bg-void-800/30 group">
+                                <span class="text-[10px] text-void-400 mt-0.5 w-4 text-right flex-shrink-0" x-text="taskIdx + 1"></span>
+                                <i :class="planTaskIcon(task.status)" class="mt-0.5 text-xs flex-shrink-0"></i>
+                                <div class="flex-1 min-w-0 cursor-pointer" @click="openTaskDetail(task)">
+                                    <div class="text-xs" x-text="task.title"></div>
+                                    <div x-show="task.result" class="text-[10px] text-void-400 mt-0.5 truncate" x-text="task.result"></div>
+                                </div>
+                                <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button @click="openTaskDetail(task)"
+                                            class="p-0.5 rounded hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
+                                            title="{{ _('Edit') }}">
+                                        <i class="fas fa-pen text-[10px]"></i>
+                                    </button>
+                                    <button x-show="task.status === 'pending' && currentPlan && (currentPlan.status === 'draft' || currentPlan.status === 'paused')"
+                                            @click="removePlanTask(task.id)"
+                                            class="p-0.5 rounded hover:bg-red-500/10 text-void-400 hover:text-red-500 transition-all"
+                                            title="{{ _('Remove') }}">
+                                        <i class="fas fa-xmark text-[10px]"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <template x-if="currentPlan && (currentPlan.status === 'draft' || currentPlan.status === 'paused')">
+                        <div class="flex gap-1.5 mt-2">
+                            <input type="text" x-model="_newPlanTask" placeholder="{{ _('Add task...') }}"
+                                   @keydown.enter="addPlanTask()"
+                                   class="flex-1 px-2 py-1 rounded-lg bg-white dark:bg-void-800/50 border border-void-200 dark:border-void-700 text-xs focus:ring-1 focus:ring-nordic-500/40 outline-none">
+                            <button @click="addPlanTask()" :disabled="!_newPlanTask || !_newPlanTask.trim()"
+                                    class="px-2 py-1 rounded-lg bg-nordic-500/10 hover:bg-nordic-500/20 text-nordic-600 text-xs transition-colors disabled:opacity-50">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+                <!-- Task detail modal -->
+                <div x-show="_editingTask" x-transition
+                     class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+                     @click.self="_editingTask = null">
+                    <div class="bg-white dark:bg-void-900 rounded-2xl border border-void-200 dark:border-void-700 shadow-xl w-full max-w-md mx-4 p-5">
+                        <template x-if="_editingTask">
+                            <div>
+                                <div class="flex items-center justify-between mb-4">
+                                    <div class="flex items-center gap-2">
+                                        <i :class="planTaskIcon(_editingTask.status)" class="text-sm"></i>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-void-100 dark:bg-void-800" x-text="_editingTask.status"></span>
+                                    </div>
+                                    <button @click="_editingTask = null" class="p-1 rounded-lg hover:bg-void-100 dark:hover:bg-void-800 text-void-400 hover:text-void-600">
+                                        <i class="fas fa-xmark"></i>
+                                    </button>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-[10px] font-medium text-void-500 mb-1 block">{{ _("Title") }}</label>
+                                    <input type="text" x-model="_editingTask.title"
+                                           :disabled="currentPlan && currentPlan.status !== 'draft' && currentPlan.status !== 'paused'"
+                                           class="w-full px-3 py-2 rounded-lg bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 text-sm focus:ring-2 focus:ring-nordic-500/40 outline-none disabled:opacity-50">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="text-[10px] font-medium text-void-500 mb-1 block">{{ _("Description") }}</label>
+                                    <textarea x-model="_editingTask.description" rows="3"
+                                              :disabled="currentPlan && currentPlan.status !== 'draft' && currentPlan.status !== 'paused'"
+                                              placeholder="{{ _('Optional description...') }}"
+                                              class="w-full px-3 py-2 rounded-lg bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 text-sm focus:ring-2 focus:ring-nordic-500/40 outline-none resize-none disabled:opacity-50"></textarea>
+                                </div>
+                                <template x-if="_editingTask.result">
+                                    <div class="mb-3">
+                                        <label class="text-[10px] font-medium text-void-500 mb-1 block">{{ _("Result") }}</label>
+                                        <div class="px-3 py-2 rounded-lg bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 text-sm text-void-600 dark:text-void-300 whitespace-pre-wrap max-h-40 overflow-y-auto"
+                                             x-text="_editingTask.result"></div>
+                                    </div>
+                                </template>
+                                <div class="flex justify-end gap-2 mt-4">
+                                    <button @click="_editingTask = null"
+                                            class="px-3 py-1.5 rounded-lg text-sm text-void-500 hover:bg-void-100 dark:hover:bg-void-800 transition-colors">
+                                        {{ _("Close") }}
+                                    </button>
+                                    <template x-if="currentPlan && (currentPlan.status === 'draft' || currentPlan.status === 'paused')">
+                                        <button @click="saveTaskDetail()" class="px-3 py-1.5 rounded-lg bg-nordic-500 hover:bg-nordic-600 text-white text-sm font-medium transition-colors">
+                                            {{ _("Save") }}
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
                 <!-- Messages -->
                 <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 rounded-2xl border border-void-200 dark:border-void-800 bg-white/50 dark:bg-void-900/30 p-4 relative"
                      @dragover.prevent="dragOver = true"
@@ -422,10 +556,14 @@
                         </div>
                     </template>
                     <template x-if="isTyping">
-                        <div class="msg-agent mr-2 sm:mr-8 rounded-xl p-4">
+                        <div class="msg-agent mr-2 sm:mr-8 rounded-xl p-4 flex items-center gap-3">
                             <div class="typing-indicator text-void-400">
                                 <span></span><span></span><span></span>
                             </div>
+                            <button @click="stopAgent()"
+                                    class="px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-medium transition-colors flex items-center gap-1">
+                                <i class="fas fa-stop"></i> Stop
+                            </button>
                         </div>
                     </template>
                 </div>
@@ -576,6 +714,13 @@ function chatApp() {
         docsPanelOpen: false,
         conversationDocs: [],
         docsUploading: false,
+
+        // Plan
+        planPanelOpen: false,
+        currentPlan: null,
+        _newPlanTask: '',
+        _planResuming: false,
+        _editingTask: null,
 
         // Participants
         participantsPanelOpen: false,
@@ -834,6 +979,11 @@ function chatApp() {
             // Load documents
             self.loadDocuments();
 
+            // Load plan
+            self.currentPlan = null;
+            self.planPanelOpen = false;
+            self.loadPlan();
+
             // Load conversation context
             fetch('/me/chat/api/conversations/' + conv.id + '/context')
                 .then(function(r) { return r.json(); })
@@ -1086,6 +1236,37 @@ function chatApp() {
                             break;
                         }
                     }
+                } else if (data.type === 'stopped') {
+                    self.isTyping = false;
+                } else if (data.type === 'plan_created') {
+                    self.currentPlan = data.plan;
+                    self.planPanelOpen = true;
+                    // Update has_plan on the conversation in sidebar
+                    var conv = self.conversations.find(function(c) { return c.id === self.activeConversationId; });
+                    if (conv) conv.has_plan = true;
+                } else if (data.type === 'plan_task_update') {
+                    if (self.currentPlan) {
+                        var task = self.currentPlan.tasks.find(function(t) { return t.id === data.task_id; });
+                        if (task) {
+                            task.status = data.status;
+                            if (data.result) task.result = data.result;
+                        }
+                        if (data.plan_status) self.currentPlan.status = data.plan_status;
+                    }
+                } else if (data.type === 'plan_updated') {
+                    if (self.currentPlan && self.currentPlan.id === data.plan_id) {
+                        var ch = data.changes || {};
+                        if (ch.status) self.currentPlan.status = ch.status;
+                        // Reload full plan from DB for structural changes
+                        if (ch.added_tasks || ch.removed_tasks || ch.reordered || ch.updated_tasks) {
+                            self.loadPlan();
+                        }
+                        // Update sidebar has_plan flag
+                        if (ch.status === 'cancelled' || ch.status === 'completed') {
+                            var conv = self.conversations.find(function(c) { return c.id === self.activeConversationId; });
+                            if (conv) conv.has_plan = false;
+                        }
+                    }
                 }
             };
 
@@ -1164,6 +1345,13 @@ function chatApp() {
 
             var self = this;
             this.$nextTick(function() { self.scrollToBottom(); });
+        },
+
+        stopAgent() {
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({ type: 'stop' }));
+            }
+            this.isTyping = false;
         },
 
         switchAgent() {
@@ -1595,6 +1783,126 @@ function chatApp() {
             if (bytes < 1024) return bytes + ' B';
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
             return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        },
+
+        // --- Plan ---
+
+        loadPlan() {
+            var self = this;
+            if (!self.activeConversationId) return;
+            fetch('/me/chat/api/conversations/' + self.activeConversationId + '/plan')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.ok) self.currentPlan = data.data || null;
+                })
+                .catch(function(e) { console.error('loadPlan error', e); });
+        },
+
+        planTaskIcon(status) {
+            if (status === 'completed') return 'fas fa-check-circle text-green-500';
+            if (status === 'in_progress') return 'fas fa-circle-notch fa-spin text-nordic-500';
+            if (status === 'failed') return 'fas fa-times-circle text-red-500';
+            if (status === 'skipped') return 'fas fa-minus-circle text-void-400';
+            return 'far fa-circle text-void-300';
+        },
+
+        planStatusBadge(status) {
+            if (status === 'draft') return 'bg-void-200 text-void-600';
+            if (status === 'active') return 'bg-nordic-500/20 text-nordic-600';
+            if (status === 'paused') return 'bg-amber-500/20 text-amber-600';
+            if (status === 'completed') return 'bg-green-500/20 text-green-600';
+            if (status === 'cancelled') return 'bg-red-500/20 text-red-600';
+            return 'bg-void-200 text-void-600';
+        },
+
+        executePlan() {
+            if (!this.activeConversationId) return;
+            this.sendMessage('Proceed with the plan.');
+        },
+
+        resumePlan() {
+            var self = this;
+            if (!self.activeConversationId) return;
+            fetch('/me/chat/api/conversations/' + self.activeConversationId + '/plan/resume', {
+                method: 'POST',
+                headers: {'X-CSRF-Token': self._csrfToken()}
+            }).then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    self._planResuming = true;
+                    self.sendMessage('Continue with the plan.');
+                    setTimeout(function() { self._planResuming = false; }, 2000);
+                }
+            });
+        },
+
+        pausePlan() {
+            var self = this;
+            if (!self.activeConversationId) return;
+            fetch('/me/chat/api/conversations/' + self.activeConversationId + '/plan/status', {
+                method: 'POST',
+                headers: Object.assign({'Content-Type': 'application/json'}, {'X-CSRF-Token': self._csrfToken()}),
+                body: JSON.stringify({status: 'paused'})
+            });
+        },
+
+        cancelPlan() {
+            var self = this;
+            if (!self.activeConversationId) return;
+            fetch('/me/chat/api/conversations/' + self.activeConversationId + '/plan/status', {
+                method: 'POST',
+                headers: Object.assign({'Content-Type': 'application/json'}, {'X-CSRF-Token': self._csrfToken()}),
+                body: JSON.stringify({status: 'cancelled'})
+            });
+        },
+
+        addPlanTask() {
+            var self = this;
+            var title = (self._newPlanTask || '').trim();
+            if (!title || !self.activeConversationId) return;
+            fetch('/me/chat/api/conversations/' + self.activeConversationId + '/plan/tasks', {
+                method: 'POST',
+                headers: Object.assign({'Content-Type': 'application/json'}, {'X-CSRF-Token': self._csrfToken()}),
+                body: JSON.stringify({title: title})
+            }).then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) self._newPlanTask = '';
+            });
+        },
+
+        removePlanTask(taskId) {
+            var self = this;
+            if (!self.activeConversationId) return;
+            fetch('/me/chat/api/conversations/' + self.activeConversationId + '/plan/tasks/' + taskId, {
+                method: 'DELETE',
+                headers: {'X-CSRF-Token': self._csrfToken()}
+            });
+        },
+
+        openTaskDetail(task) {
+            // Clone to avoid mutating the plan task directly
+            this._editingTask = Object.assign({}, task);
+        },
+
+        saveTaskDetail() {
+            var self = this;
+            if (!self._editingTask || !self.activeConversationId) return;
+            var task = self._editingTask;
+            // Update in-memory plan
+            if (self.currentPlan) {
+                var original = self.currentPlan.tasks.find(function(t) { return t.id === task.id; });
+                if (original) {
+                    original.title = task.title;
+                    original.description = task.description;
+                }
+            }
+            // Persist to backend
+            fetch('/me/chat/api/conversations/' + self.activeConversationId + '/plan/tasks/' + task.id, {
+                method: 'POST',
+                headers: Object.assign({'Content-Type': 'application/json'}, {'X-CSRF-Token': self._csrfToken()}),
+                body: JSON.stringify({title: task.title, description: task.description})
+            });
+            self._editingTask = null;
         },
 
         autoResize(event) {

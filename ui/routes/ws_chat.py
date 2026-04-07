@@ -35,6 +35,9 @@ _conversation_locks: dict[str, asyncio.Lock] = {}
 # Background tasks — prevent garbage collection
 _background_tasks: set[asyncio.Task] = set()
 
+# Per-user active processing task (for stop/cancel)
+_active_tasks: dict[str, asyncio.Task] = {}
+
 
 def _get_conversation_lock(conversation_id: str) -> asyncio.Lock:
     if conversation_id not in _conversation_locks:
@@ -291,6 +294,71 @@ def _save_message(
         logger.warning(f"WebChat: failed to save message: {e}")
 
 
+MAX_AUTO_CONTINUE = 20
+
+
+def _build_auto_continue_message(conversation_id: str) -> str | None:
+    """Build system message for plan auto-continuation. None if not needed."""
+    try:
+        from ui.routes.chat_api import get_active_plan
+
+        plan = get_active_plan(conversation_id)
+        if not plan or plan["status"] != "active":
+            return None
+
+        if plan["auto_continue_count"] >= MAX_AUTO_CONTINUE:
+            from core.registry import get_database
+
+            db = get_database()
+            with db.acquire_sync() as conn:
+                conn.execute(
+                    "UPDATE chat.webchat_plans SET status = 'paused', "
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                    (plan["id"],),
+                )
+                conn.commit()
+            return None
+
+        tasks = plan.get("tasks", [])
+        pending = [t for t in tasks if t["status"] == "pending"]
+        if not pending:
+            return None
+
+        completed = [t for t in tasks if t["status"] == "completed"]
+        recent = completed[-3:]
+
+        parts = ["[SYSTEM] Continue with the next task in the plan."]
+        if recent:
+            parts.append("Recently completed:")
+            for t in recent:
+                result_text = (t.get("result") or "")[:200]
+                parts.append(f'  - {t["title"]} -> "{result_text}"')
+
+        next_task = pending[0]
+        parts.append("Next task:")
+        parts.append(f"  - {next_task['title']}")
+        if next_task.get("description"):
+            parts.append(f"    {next_task['description']}")
+        parts.append(f"Remaining: {len(pending)} tasks pending")
+
+        from core.registry import get_database
+
+        db = get_database()
+        with db.acquire_sync() as conn:
+            conn.execute(
+                "UPDATE chat.webchat_plans "
+                "SET auto_continue_count = auto_continue_count + 1, "
+                "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (plan["id"],),
+            )
+            conn.commit()
+
+        return "\n".join(parts)
+    except Exception as exc:
+        logger.debug("Auto-continue check failed: %s", exc)
+        return None
+
+
 @router.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket):
     """WebSocket endpoint for user chat."""
@@ -381,12 +449,71 @@ async def ws_chat(websocket: WebSocket):
                     )
                 continue
 
+            if msg_type == "stop":
+                # Abort the agent processing on the bot container
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        await session.post(
+                            f"{GRIDBEAR_URL}/api/chat/abort",
+                            json={
+                                "username": uid,
+                                "conversation_id": conversation_id or "default",
+                            },
+                            headers={"Authorization": f"Bearer {GRIDBEAR_SECRET}"},
+                            timeout=aiohttp.ClientTimeout(total=5),
+                        )
+                    logger.info(f"WebChat: user {uid} aborted agent processing")
+                except Exception as exc:
+                    logger.debug(f"WebChat: abort request failed: {exc}")
+                # Also cancel the local streaming task
+                active = _active_tasks.pop(uid, None)
+                if active and not active.done():
+                    active.cancel()
+                try:
+                    await websocket.send_json({"type": "stopped"})
+                except Exception:
+                    pass
+                continue
+
             if msg_type == "message":
                 text = data.get("text", "").strip()
                 attachments = data.get("attachments") or []
                 context_prompt = data.get("context_prompt") or None
                 if not text and not attachments:
                     continue
+
+                # Pause active plan when user sends a message
+                if conversation_id:
+                    try:
+                        from ui.routes.chat_api import get_active_plan
+
+                        plan = get_active_plan(conversation_id)
+                        if plan and plan["status"] == "active":
+                            from core.registry import get_database
+
+                            db = get_database()
+                            with db.acquire_sync() as conn:
+                                conn.execute(
+                                    "UPDATE chat.webchat_plans "
+                                    "SET status = 'paused', "
+                                    "updated_at = CURRENT_TIMESTAMP "
+                                    "WHERE id = %s",
+                                    (plan["id"],),
+                                )
+                                conn.commit()
+                            await broadcast_to_conversation(
+                                conversation_id,
+                                {
+                                    "type": "plan_updated",
+                                    "plan_id": plan["id"],
+                                    "changes": {"status": "paused"},
+                                },
+                            )
+                            logger.info(
+                                f"WebChat: paused plan {plan['id'][:8]} on user message"
+                            )
+                    except Exception:
+                        pass
 
                 # Persist user message
                 save_text = text
@@ -515,6 +642,58 @@ async def ws_chat(websocket: WebSocket):
                                         "title": title,
                                     },
                                 )
+
+                        # Auto-continue loop for active plans
+                        if _conv_id and result:
+                            while True:
+                                auto_msg = _build_auto_continue_message(_conv_id)
+                                if not auto_msg:
+                                    break
+
+                                # Brief lock to verify plan is still active
+                                lock = (
+                                    _get_conversation_lock(_conv_id)
+                                    if _conv_id
+                                    else None
+                                )
+                                if lock:
+                                    await lock.acquire()
+                                try:
+                                    from ui.routes.chat_api import get_active_plan
+
+                                    plan = get_active_plan(_conv_id)
+                                    if not plan or plan["status"] != "active":
+                                        break
+                                finally:
+                                    if lock and lock.locked():
+                                        lock.release()
+
+                                # Stream WITHOUT lock
+                                logger.info(
+                                    "WebChat: auto-continue plan "
+                                    f"conv={_conv_id[:8]}..."
+                                )
+                                _save_message(
+                                    _conv_id,
+                                    "user",
+                                    auto_msg,
+                                    sender_id="system",
+                                )
+                                await broadcast_to_conversation(
+                                    _conv_id, {"type": "typing"}
+                                )
+                                cont_result = await _stream_from_gridbear(
+                                    auto_msg,
+                                    _user,
+                                    _agent,
+                                    _ws,
+                                    _conv_id,
+                                )
+                                if cont_result:
+                                    _save_message(_conv_id, "assistant", cont_result)
+                                else:
+                                    break
+
                     except Exception:
                         logger.exception("WebChat: background processing error")
 
@@ -530,7 +709,13 @@ async def ws_chat(websocket: WebSocket):
                     )
                 )
                 _background_tasks.add(task)
-                task.add_done_callback(_background_tasks.discard)
+                _active_tasks[uid] = task
+
+                def _on_task_done(t, _uid=uid):
+                    _background_tasks.discard(t)
+                    _active_tasks.pop(_uid, None)
+
+                task.add_done_callback(_on_task_done)
 
     except WebSocketDisconnect:
         pass
