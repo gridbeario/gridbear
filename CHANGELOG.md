@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-04-07
+
+### Added
+
+- **Agent Planning Mode**: New `plugins/planning/` plugin lets agents break complex requests into task plans. Virtual MCP tools (`plan_create`, `plan_task_update`, `plan_update`) for plan management, collapsible plan panel in webchat with status badges, action buttons (execute/pause/resume/cancel), task editing modal, add/remove/reorder tasks, numbered task list
+- **Auto-continuation**: Between tasks the system auto-sends a continuation message to the agent, avoiding timeouts on long plans. Safety limit (20 continuations), lock-free streaming, re-verification of plan status to handle user pause races
+- **Pause on user message**: When the user writes during an active plan, it pauses after the current task
+- **Stop Agent Button**: End-to-end abort from webchat. Frontend sends `{type: "stop"}` → UI container calls `/api/chat/abort` → bot cancels asyncio task → runner kills Claude subprocess (subprocess mode) or destroys pooled process (pool mode)
+- **Per-Conversation Documents (RAG)**: Upload PDF/DOCX/XLSX/TXT/CSV files to a conversation's knowledge base. Text extracted at upload (pypdf, python-docx, openpyxl) and injected into agent context. Collapsible documents panel with upload/delete, 200KB extraction cap + 100KB context injection cap
+- **Dependencies**: `pypdf`, `python-docx` added to `data` extras
+
+### Improved
+
+- **Dynamic plugin list on agent config page**: Replace hardcoded plugin whitelist with `available_services` from DB — all enabled service plugins now appear automatically
+- **Webchat mobile responsive layout**: Fix horizontal overflow on small screens (root cause: missing `min-w-0` on main content flex child in `me/base.html`), show conversation action icons always on mobile (hover doesn't work on touch), add CSS for markdown prose max-width and word-break
+- **Plugin isolation**: Move `/rlm-query` endpoint from `core/internal_api/server.py` to `plugins/rlm/api/routes.py` (core must not reference plugins)
+
+### Fixed
+
+- **Peggy "SKIP" bug on Telegram**: Workflow `notification` step with `agent_id` + `prompt` passed the email summary as a new prompt to the agent, which then (confused by context) replied "SKIP". Changed to template mode (`message` field only) so notifications are sent directly without agent re-interpretation
+- **Planning tool editing**: New `update_tasks` field on `plan_update` lets agent edit existing task title/description instead of remove+add. Frontend reloads plan from DB on structural changes (`added_tasks`/`removed_tasks`/`updated_tasks`/`reordered`)
+- **Plan icon visibility**: Only show plan toggle in conversation list when `has_plan` is true (new DB column via EXISTS subquery in list endpoint)
+
+### Dependencies
+
+- Bumped `fastapi` 0.135.2 → 0.135.3, `uvicorn` 0.42.0 → 0.44.0, `python-multipart`
+
 ## [0.7.0] - 2026-04-05
 
 ### Added
