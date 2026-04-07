@@ -411,8 +411,7 @@
         </div>
         <div class="p-5">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {% set common_plugins = ['memory', 'sessions', 'skills', 'memo', 'voice', 'tts-openai', 'tts-elevenlabs', 'image', 'image-openai', 'image-pollinations', 'attachments'] %}
-                {% for plugin in common_plugins %}
+                {% for plugin in available_services %}
                 <label class="flex items-center gap-2 p-3 rounded-xl hover:bg-void-50 dark:hover:bg-void-800/50 cursor-pointer transition-colors border border-transparent hover:border-void-200 dark:hover:border-void-700">
                     <input type="checkbox" name="plugins_enabled" value="{{ plugin }}"
                            {% if agent and plugin in agent.get('plugins', {}).get('enabled', []) %}checked{% endif %}
