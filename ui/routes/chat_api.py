@@ -166,6 +166,26 @@ def _ensure_db():
         """)
         conn.commit()
 
+    # Plan tables migration
+    with _db.acquire_sync() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM public._migrations WHERE name = %s",
+            ("010_webchat_plans",),
+        ).fetchone()
+        if not row:
+            sql = (
+                BASE_DIR / "scripts" / "migrations" / "010_webchat_plans.sql"
+            ).read_text()
+            conn.execute(sql)
+            conn.execute(
+                "INSERT INTO public._migrations (name) VALUES (%s)",
+                ("010_webchat_plans",),
+            )
+            conn.commit()
+            logger.info("Applied 010_webchat_plans migration")
+        else:
+            conn.rollback()
+
     _initialized = True
 
 
@@ -336,7 +356,12 @@ async def list_conversations(request: Request, user: dict = Depends(require_user
         if agent:
             cur = conn.execute(
                 """SELECT c.id, c.agent_name, c.title, c.created_at,
-                          c.updated_at, c.type, c.context_prompt
+                          c.updated_at, c.type, c.context_prompt,
+                          EXISTS(
+                              SELECT 1 FROM chat.webchat_plans pl
+                              WHERE pl.conversation_id = c.id
+                              AND pl.status NOT IN ('completed', 'cancelled')
+                          ) as has_plan
                    FROM chat.webchat_conversations c
                    JOIN chat.webchat_participants p
                         ON c.id = p.conversation_id
@@ -347,7 +372,12 @@ async def list_conversations(request: Request, user: dict = Depends(require_user
         else:
             cur = conn.execute(
                 """SELECT c.id, c.agent_name, c.title, c.created_at,
-                          c.updated_at, c.type, c.context_prompt
+                          c.updated_at, c.type, c.context_prompt,
+                          EXISTS(
+                              SELECT 1 FROM chat.webchat_plans pl
+                              WHERE pl.conversation_id = c.id
+                              AND pl.status NOT IN ('completed', 'cancelled')
+                          ) as has_plan
                    FROM chat.webchat_conversations c
                    JOIN chat.webchat_participants p
                         ON c.id = p.conversation_id
@@ -1117,6 +1147,353 @@ def get_conversation_documents(conversation_id: str) -> list[dict]:
             (conversation_id,),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# --- Plan management ---
+
+
+def get_active_plan(conversation_id: str) -> dict | None:
+    """Get the active/draft/paused plan for a conversation, with tasks."""
+    _ensure_db()
+    with _db.acquire_sync() as conn:
+        plan = conn.execute(
+            "SELECT id, title, status, created_by, auto_continue_count, "
+            "created_at, updated_at "
+            "FROM chat.webchat_plans "
+            "WHERE conversation_id = %s "
+            "AND status NOT IN ('completed', 'cancelled') "
+            "ORDER BY created_at DESC LIMIT 1",
+            (conversation_id,),
+        ).fetchone()
+        if not plan:
+            return None
+        tasks = conn.execute(
+            "SELECT id, position, title, description, status, result, "
+            "started_at, completed_at "
+            "FROM chat.webchat_plan_tasks "
+            "WHERE plan_id = %s ORDER BY position",
+            (plan["id"],),
+        ).fetchall()
+    return {**dict(plan), "tasks": [dict(t) for t in tasks]}
+
+
+@router.get(
+    "/conversations/{conv_id}/plan",
+    response_model=ApiResponse[dict | None],
+    response_model_exclude_none=True,
+)
+async def get_plan(conv_id: str, user: dict = Depends(require_user)):
+    """Get current plan for a conversation."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+    plan = get_active_plan(conv_id)
+    return api_ok(data=plan)
+
+
+@router.post(
+    "/conversations/{conv_id}/plan/tasks",
+    response_model=ApiResponse[dict],
+    response_model_exclude_none=True,
+)
+async def add_plan_task(
+    conv_id: str, request: Request, user: dict = Depends(require_user)
+):
+    """Add a task to the current plan. Only when draft/paused."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+
+    body = await request.json()
+    title = body.get("title", "").strip()
+    if not title:
+        return api_error(400, "Title required", "validation_error")
+
+    with _db.acquire_sync() as conn:
+        plan = conn.execute(
+            "SELECT id, status FROM chat.webchat_plans "
+            "WHERE conversation_id = %s "
+            "AND status NOT IN ('completed', 'cancelled') LIMIT 1",
+            (conv_id,),
+        ).fetchone()
+        if not plan:
+            return api_error(404, "No active plan", "not_found")
+        if plan["status"] not in ("draft", "paused"):
+            return api_error(
+                400, "Plan must be draft or paused to add tasks", "invalid_state"
+            )
+
+        max_pos = conn.execute(
+            "SELECT COALESCE(MAX(position), -1) as mp "
+            "FROM chat.webchat_plan_tasks WHERE plan_id = %s",
+            (plan["id"],),
+        ).fetchone()["mp"]
+
+        task_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO chat.webchat_plan_tasks "
+            "(id, plan_id, position, title, description, status) "
+            "VALUES (%s, %s, %s, %s, %s, 'pending')",
+            (task_id, plan["id"], max_pos + 1, title, body.get("description")),
+        )
+        conn.commit()
+
+    from ui.routes.ws_chat import broadcast_to_conversation
+
+    await broadcast_to_conversation(
+        conv_id,
+        {
+            "type": "plan_updated",
+            "plan_id": plan["id"],
+            "changes": {
+                "added_tasks": [
+                    {
+                        "id": task_id,
+                        "position": max_pos + 1,
+                        "title": title,
+                        "status": "pending",
+                    }
+                ]
+            },
+        },
+    )
+    return api_ok(data={"id": task_id, "title": title})
+
+
+@router.delete(
+    "/conversations/{conv_id}/plan/tasks/{task_id}",
+    response_model=ApiResponse[dict],
+    response_model_exclude_none=True,
+)
+async def remove_plan_task(
+    conv_id: str, task_id: str, user: dict = Depends(require_user)
+):
+    """Remove a pending task. Only when draft/paused."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+
+    with _db.acquire_sync() as conn:
+        plan = conn.execute(
+            "SELECT id, status FROM chat.webchat_plans "
+            "WHERE conversation_id = %s "
+            "AND status NOT IN ('completed', 'cancelled') LIMIT 1",
+            (conv_id,),
+        ).fetchone()
+        if not plan or plan["status"] not in ("draft", "paused"):
+            return api_error(400, "Plan must be draft or paused", "invalid_state")
+
+        deleted = conn.execute(
+            "DELETE FROM chat.webchat_plan_tasks "
+            "WHERE id = %s AND plan_id = %s AND status = 'pending' RETURNING id",
+            (task_id, plan["id"]),
+        ).fetchone()
+        if not deleted:
+            return api_error(404, "Task not found or not pending", "not_found")
+        conn.commit()
+
+    from ui.routes.ws_chat import broadcast_to_conversation
+
+    await broadcast_to_conversation(
+        conv_id,
+        {
+            "type": "plan_updated",
+            "plan_id": plan["id"],
+            "changes": {"removed_tasks": [task_id]},
+        },
+    )
+    return api_ok()
+
+
+@router.post(
+    "/conversations/{conv_id}/plan/tasks/{task_id}",
+    response_model=ApiResponse[dict],
+    response_model_exclude_none=True,
+)
+async def update_plan_task(
+    conv_id: str,
+    task_id: str,
+    request: Request,
+    user: dict = Depends(require_user),
+):
+    """Update a task's title/description. Only when draft/paused."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+
+    body = await request.json()
+    title = body.get("title", "").strip()
+    description = body.get("description")
+
+    if not title:
+        return api_error(400, "Title required", "validation_error")
+
+    with _db.acquire_sync() as conn:
+        plan = conn.execute(
+            "SELECT id, status FROM chat.webchat_plans "
+            "WHERE conversation_id = %s "
+            "AND status NOT IN ('completed', 'cancelled') LIMIT 1",
+            (conv_id,),
+        ).fetchone()
+        if not plan or plan["status"] not in ("draft", "paused"):
+            return api_error(400, "Plan must be draft or paused", "invalid_state")
+
+        conn.execute(
+            "UPDATE chat.webchat_plan_tasks SET title = %s, description = %s "
+            "WHERE id = %s AND plan_id = %s",
+            (title, description, task_id, plan["id"]),
+        )
+        conn.commit()
+
+    return api_ok()
+
+
+@router.post(
+    "/conversations/{conv_id}/plan/tasks/reorder",
+    response_model=ApiResponse[dict],
+    response_model_exclude_none=True,
+)
+async def reorder_plan_tasks(
+    conv_id: str, request: Request, user: dict = Depends(require_user)
+):
+    """Reorder tasks. Only when draft/paused."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+
+    body = await request.json()
+    task_ids = body.get("task_ids", [])
+    if not task_ids:
+        return api_error(400, "task_ids required", "validation_error")
+
+    with _db.acquire_sync() as conn:
+        plan = conn.execute(
+            "SELECT id, status FROM chat.webchat_plans "
+            "WHERE conversation_id = %s "
+            "AND status NOT IN ('completed', 'cancelled') LIMIT 1",
+            (conv_id,),
+        ).fetchone()
+        if not plan or plan["status"] not in ("draft", "paused"):
+            return api_error(400, "Plan must be draft or paused", "invalid_state")
+
+        for i, tid in enumerate(task_ids):
+            conn.execute(
+                "UPDATE chat.webchat_plan_tasks SET position = %s "
+                "WHERE id = %s AND plan_id = %s",
+                (i, tid, plan["id"]),
+            )
+        conn.commit()
+
+    from ui.routes.ws_chat import broadcast_to_conversation
+
+    await broadcast_to_conversation(
+        conv_id,
+        {
+            "type": "plan_updated",
+            "plan_id": plan["id"],
+            "changes": {"reordered": task_ids},
+        },
+    )
+    return api_ok()
+
+
+@router.post(
+    "/conversations/{conv_id}/plan/status",
+    response_model=ApiResponse[dict],
+    response_model_exclude_none=True,
+)
+async def update_plan_status(
+    conv_id: str, request: Request, user: dict = Depends(require_user)
+):
+    """User-initiated plan status change (pause/cancel from panel)."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+
+    body = await request.json()
+    new_status = body.get("status", "").strip()
+    if new_status not in ("paused", "cancelled"):
+        return api_error(400, "Status must be paused or cancelled", "validation_error")
+
+    with _db.acquire_sync() as conn:
+        plan = conn.execute(
+            "SELECT id, status FROM chat.webchat_plans "
+            "WHERE conversation_id = %s "
+            "AND status NOT IN ('completed', 'cancelled') LIMIT 1",
+            (conv_id,),
+        ).fetchone()
+        if not plan:
+            return api_error(404, "No active plan", "not_found")
+
+        if new_status == "paused" and plan["status"] != "active":
+            return api_error(400, "Can only pause an active plan", "invalid_state")
+
+        conn.execute(
+            "UPDATE chat.webchat_plans SET status = %s, "
+            "updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+            (new_status, plan["id"]),
+        )
+        conn.commit()
+
+    from ui.routes.ws_chat import broadcast_to_conversation
+
+    await broadcast_to_conversation(
+        conv_id,
+        {
+            "type": "plan_updated",
+            "plan_id": plan["id"],
+            "changes": {"status": new_status},
+        },
+    )
+    return api_ok()
+
+
+@router.post(
+    "/conversations/{conv_id}/plan/resume",
+    response_model=ApiResponse[dict],
+    response_model_exclude_none=True,
+)
+async def resume_plan(conv_id: str, user: dict = Depends(require_user)):
+    """Resume a paused plan. Resets auto_continue_count and sets active."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+
+    with _db.acquire_sync() as conn:
+        plan = conn.execute(
+            "SELECT id, status FROM chat.webchat_plans "
+            "WHERE conversation_id = %s AND status = 'paused' LIMIT 1",
+            (conv_id,),
+        ).fetchone()
+        if not plan:
+            return api_error(404, "No paused plan", "not_found")
+
+        conn.execute(
+            "UPDATE chat.webchat_plans SET status = 'active', "
+            "auto_continue_count = 0, updated_at = CURRENT_TIMESTAMP "
+            "WHERE id = %s",
+            (plan["id"],),
+        )
+        conn.commit()
+
+    from ui.routes.ws_chat import broadcast_to_conversation
+
+    await broadcast_to_conversation(
+        conv_id,
+        {
+            "type": "plan_updated",
+            "plan_id": plan["id"],
+            "changes": {"status": "active"},
+        },
+    )
+    return api_ok()
 
 
 # --- TTS ---

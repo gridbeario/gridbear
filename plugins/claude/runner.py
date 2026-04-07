@@ -590,6 +590,11 @@ class ClaudeRunner(BaseRunner):
             process.kill()
             await process.wait()
             raise
+        except asyncio.CancelledError:
+            process.kill()
+            await process.wait()
+            logger.info("Claude subprocess killed (task cancelled)")
+            raise
 
         stdout_str = stdout.decode()
         stderr_str = stderr.decode() if stderr else ""
@@ -732,6 +737,12 @@ class ClaudeRunner(BaseRunner):
                 is_error=True,
                 raw={},
             )
+        except asyncio.CancelledError:
+            logger.info("Pooled request cancelled (user abort)")
+            if pooled:
+                await self._pool.destroy(pooled)
+                pooled = None
+            raise
         except Exception as e:
             logger.exception(f"Error in pooled request: {e}")
             return RunnerResponse(
