@@ -24,7 +24,9 @@
         40% { opacity: 1; }
     }
     /* Markdown prose styles */
-    .prose pre { background: rgba(0,0,0,0.15); border-radius: 0.5rem; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.5em 0; }
+    .prose { min-width: 0; max-width: 100%; overflow-wrap: break-word; word-break: break-word; }
+    .prose pre { background: rgba(0,0,0,0.15); border-radius: 0.5rem; padding: 0.75rem 1rem; overflow-x: auto; margin: 0.5em 0; max-width: 100%; }
+    .prose img { max-width: 100%; height: auto; }
     .prose code { background: rgba(0,0,0,0.1); border-radius: 0.25rem; padding: 0.1em 0.3em; font-size: 0.85em; }
     .prose pre code { background: none; padding: 0; font-size: 0.85em; }
     .prose ul, .prose ol { padding-left: 1.5em; margin: 0.5em 0; }
@@ -162,7 +164,7 @@
                             <p class="text-[10px] text-void-400 mt-0.5" x-text="formatDate(conv.updated_at)"></p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                    <div class="flex items-center gap-0.5 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
                         <button @click.stop="selectConversation(conv); contextPanelOpen = !contextPanelOpen"
                                 class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all relative"
                                 title="{{ _("Context") }}">
@@ -415,7 +417,7 @@
                                     <div class="text-xs" x-text="task.title"></div>
                                     <div x-show="task.result" class="text-[10px] text-void-400 mt-0.5 truncate" x-text="task.result"></div>
                                 </div>
-                                <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                                <div class="flex items-center gap-0.5 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
                                     <button @click="openTaskDetail(task)"
                                             class="p-0.5 rounded hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
                                             title="{{ _('Edit') }}">
@@ -495,7 +497,7 @@
                     </div>
                 </div>
                 <!-- Messages -->
-                <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 rounded-2xl border border-void-200 dark:border-void-800 bg-white/50 dark:bg-void-900/30 p-4 relative"
+                <div id="chat-messages" class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden space-y-3 rounded-2xl border border-void-200 dark:border-void-800 bg-white/50 dark:bg-void-900/30 p-4 relative"
                      @dragover.prevent="dragOver = true"
                      @dragleave.prevent="dragOver = false"
                      @drop.prevent="handleDrop($event)">
@@ -515,12 +517,12 @@
                         </div>
                     </template>
                     <template x-for="msg in messages" :key="msg.id">
-                        <div :class="msg.role === 'user' ? 'msg-user ml-2 sm:ml-8' : msg.role === 'other_user' ? 'msg-other-user mr-2 sm:mr-8' : msg.role === 'system' ? 'mx-2 sm:mx-8 text-center' : 'msg-agent mr-2 sm:mr-8'" class="rounded-xl p-4">
+                        <div :class="msg.role === 'user' ? 'msg-user ml-2 sm:ml-8' : msg.role === 'other_user' ? 'msg-other-user mr-2 sm:mr-8' : msg.role === 'system' ? 'mx-2 sm:mx-8 text-center' : 'msg-agent mr-2 sm:mr-8'" class="rounded-xl p-4 min-w-0 overflow-hidden">
                             <template x-if="msg.role === 'system'">
                                 <div class="text-[11px] text-void-400 italic" x-text="msg.text"></div>
                             </template>
                             <template x-if="msg.role !== 'system'">
-                                <div>
+                                <div class="min-w-0">
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="text-[10px] font-semibold uppercase tracking-wide"
                                               :class="msg.role === 'user' ? 'text-frost-500' : msg.role === 'other_user' ? 'text-amber-500' : 'text-nordic-500'"
@@ -543,7 +545,7 @@
                                             </template>
                                         </div>
                                     </template>
-                                    <div class="text-sm leading-relaxed prose max-w-none" x-html="msg.isHtml ? msg.text : renderMarkdown(msg.text)"></div>
+                                    <div class="text-sm leading-relaxed prose min-w-0 max-w-full" x-html="msg.isHtml ? msg.text : renderMarkdown(msg.text)"></div>
                                 </div>
                             </template>
                         </div>
