@@ -1,0 +1,18 @@
+{
+    "name": "Planning",
+    "version": "0.1.0",
+    "type": "service",
+    "provides": "planning",
+    "description": "Agent task planning with step-by-step execution",
+    "entry_point": "service.py",
+    "class_name": "PlanningService",
+    "virtual_tools": "virtual_tools.py",
+    "context_skills": [
+        {
+            "name": "planning-instructions",
+            "title": "Planning Tools Instructions",
+            "file": "skills/planning_instructions.md"
+        }
+    ],
+    "dependencies": []
+}
