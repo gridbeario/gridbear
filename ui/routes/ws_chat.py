@@ -482,39 +482,6 @@ async def ws_chat(websocket: WebSocket):
                 if not text and not attachments:
                     continue
 
-                # Pause active plan when user sends a message
-                if conversation_id:
-                    try:
-                        from ui.routes.chat_api import get_active_plan
-
-                        plan = get_active_plan(conversation_id)
-                        if plan and plan["status"] == "active":
-                            from core.registry import get_database
-
-                            db = get_database()
-                            with db.acquire_sync() as conn:
-                                conn.execute(
-                                    "UPDATE chat.webchat_plans "
-                                    "SET status = 'paused', "
-                                    "updated_at = CURRENT_TIMESTAMP "
-                                    "WHERE id = %s",
-                                    (plan["id"],),
-                                )
-                                conn.commit()
-                            await broadcast_to_conversation(
-                                conversation_id,
-                                {
-                                    "type": "plan_updated",
-                                    "plan_id": plan["id"],
-                                    "changes": {"status": "paused"},
-                                },
-                            )
-                            logger.info(
-                                f"WebChat: paused plan {plan['id'][:8]} on user message"
-                            )
-                    except Exception:
-                        pass
-
                 # Persist user message
                 save_text = text
                 if attachments and not text:
@@ -528,6 +495,7 @@ async def ws_chat(websocket: WebSocket):
                 if conversation_id:
                     user_msg_event = {
                         "type": "user_message",
+                        "conversation_id": conversation_id,
                         "sender": uid,
                         "display_name": user.get("display_name", uid),
                         "text": text,
@@ -539,7 +507,7 @@ async def ws_chat(websocket: WebSocket):
                         user_msg_event,
                         exclude_uid=uid,
                     )
-                    # Notify participants not currently viewing
+                    # Notify participants not currently viewing (unread only)
                     try:
                         from ui.routes.chat_api import list_conversation_participants
 
@@ -547,8 +515,6 @@ async def ws_chat(websocket: WebSocket):
                         viewers = _conversation_viewers.get(conversation_id, set())
                         for p_uid in all_parts:
                             if p_uid != uid and p_uid not in viewers:
-                                # Send the message itself + unread indicator
-                                await push_to_webchat(p_uid, user_msg_event)
                                 await push_to_webchat(
                                     p_uid,
                                     {
