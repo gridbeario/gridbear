@@ -449,23 +449,20 @@ async def get_messages(
 ):
     _ensure_db()
     uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+
+    limit = int(request.query_params.get("limit", "200"))
+    offset = int(request.query_params.get("offset", "0"))
+
     with _db.acquire_sync() as conn:
-        # Ownership check
-        row = conn.execute(
-            "SELECT 1 FROM chat.webchat_conversations WHERE id = %s AND unified_id = %s",
-            (conv_id, uid),
-        ).fetchone()
-        if not row:
-            return api_error(404, "Not found", "not_found")
-
-        limit = int(request.query_params.get("limit", "200"))
-        offset = int(request.query_params.get("offset", "0"))
-
         cur = conn.execute(
-            """SELECT id, role, content, metadata_json, created_at
-               FROM chat.webchat_messages
-               WHERE conversation_id = %s
-               ORDER BY created_at ASC
+            """SELECT m.id, m.role, m.content, m.metadata_json, m.created_at,
+                      m.sender_id, u.display_name as sender_display_name
+               FROM chat.webchat_messages m
+               LEFT JOIN app.users u ON u.username = m.sender_id
+               WHERE m.conversation_id = %s
+               ORDER BY m.created_at ASC
                LIMIT %s OFFSET %s""",
             (conv_id, limit, offset),
         )

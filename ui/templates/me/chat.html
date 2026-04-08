@@ -568,6 +568,14 @@
                             </button>
                         </div>
                     </template>
+                    <!-- New message indicator (sticky at bottom) -->
+                    <button x-show="hasNewMessages"
+                            x-transition
+                            @click="jumpToBottom()"
+                            class="sticky bottom-0 left-1/2 -translate-x-1/2 mx-auto px-3 py-1.5 rounded-full bg-nordic-500 hover:bg-nordic-600 text-white text-xs font-medium shadow-lg flex items-center gap-1.5 transition-all z-10">
+                        <i class="fas fa-arrow-down"></i>
+                        {{ _("New messages") }}
+                    </button>
                 </div>
 
                 <!-- Attachment preview strip -->
@@ -696,6 +704,7 @@ function chatApp() {
         wsConnected: false,
         ws: null,
         msgCounter: 0,
+        hasNewMessages: false,
 
         // Mobile view toggle: 'conversations' or 'chat'
         mobileView: 'conversations',
@@ -771,6 +780,19 @@ function chatApp() {
                 Notification.requestPermission();
             }
             this.loadConversations();
+
+            // Reset hasNewMessages when user manually scrolls to bottom
+            setTimeout(function() {
+                var msgEl = document.getElementById('chat-messages');
+                if (msgEl) {
+                    msgEl.addEventListener('scroll', function() {
+                        var nearBottom = (msgEl.scrollHeight - msgEl.scrollTop - msgEl.clientHeight) < 50;
+                        if (nearBottom && self.hasNewMessages) {
+                            self.hasNewMessages = false;
+                        }
+                    });
+                }
+            }, 500);
 
             // Wire up the global file input
             var fileInput = document.getElementById('file-input');
@@ -1001,17 +1023,26 @@ function chatApp() {
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     var msgs = (data.data && data.data.messages) || [];
+                    var currentUid = '{{ user.username }}';
                     self.messages = msgs.map(function(m) {
+                        var role = m.role;
+                        if (role === 'assistant') {
+                            role = 'agent';
+                        } else if (role === 'user' && m.sender_id && m.sender_id !== currentUid && m.sender_id !== 'system') {
+                            role = 'other_user';
+                        }
                         return {
                             id: ++self.msgCounter,
-                            role: m.role === 'assistant' ? 'agent' : m.role,
+                            role: role,
+                            sender: m.sender_id,
+                            display_name: m.sender_display_name || m.sender_id,
                             text: m.content,
                             time: self._formatTime(m.created_at),
                             agent: self.selectedAgent,
                         };
                     });
                     self.messagesLoading = false;
-                    self.$nextTick(function() { self.scrollToBottom(); });
+                    self.$nextTick(function() { self.scrollToBottom(true); });
                 })
                 .catch(function() {
                     self.messagesLoading = false;
@@ -1184,17 +1215,30 @@ function chatApp() {
                     self.$nextTick(function() { self.scrollToBottom(); });
                 } else if (data.type === 'user_message') {
                     // Message from another user in shared conversation
-                    var mentioned = (data.text || '').toLowerCase().indexOf('@{{ user.username }}') !== -1;
-                    self._notify(data.display_name || data.sender, (data.text || '').substring(0, 100), mentioned);
-                    self.messages.push({
-                        id: ++self.msgCounter,
-                        role: 'other_user',
-                        sender: data.sender,
-                        display_name: data.display_name || data.sender,
-                        text: data.text,
-                        time: data.time || new Date().toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'}),
-                    });
-                    self.$nextTick(function() { self.scrollToBottom(); });
+                    // Only render if it belongs to the currently active conversation
+                    if (data.conversation_id && data.conversation_id !== self.activeConversationId) {
+                        // Mark the other conversation as unread and notify
+                        var mentioned = (data.text || '').toLowerCase().indexOf('@{{ user.username }}') !== -1;
+                        self._notify(data.display_name || data.sender, (data.text || '').substring(0, 100), mentioned);
+                        for (var i = 0; i < self.conversations.length; i++) {
+                            if (self.conversations[i].id === data.conversation_id) {
+                                self.conversations[i].unread = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        var mentioned = (data.text || '').toLowerCase().indexOf('@{{ user.username }}') !== -1;
+                        self._notify(data.display_name || data.sender, (data.text || '').substring(0, 100), mentioned);
+                        self.messages.push({
+                            id: ++self.msgCounter,
+                            role: 'other_user',
+                            sender: data.sender,
+                            display_name: data.display_name || data.sender,
+                            text: data.text,
+                            time: data.time || new Date().toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'}),
+                        });
+                        self.$nextTick(function() { self.scrollToBottom(); });
+                    }
                 } else if (data.type === 'participant_joined') {
                     self.messages.push({
                         id: ++self.msgCounter,
@@ -1346,7 +1390,7 @@ function chatApp() {
             this.ws.send(JSON.stringify(payload));
 
             var self = this;
-            this.$nextTick(function() { self.scrollToBottom(); });
+            this.$nextTick(function() { self.scrollToBottom(true); });
         },
 
         stopAgent() {
@@ -1819,7 +1863,8 @@ function chatApp() {
 
         executePlan() {
             if (!this.activeConversationId) return;
-            this.sendMessage('Proceed with the plan.');
+            this.inputText = 'Proceed with the plan.';
+            this.sendMessage();
         },
 
         resumePlan() {
@@ -1832,7 +1877,8 @@ function chatApp() {
             .then(function(data) {
                 if (data.ok) {
                     self._planResuming = true;
-                    self.sendMessage('Continue with the plan.');
+                    self.inputText = 'Continue with the plan.';
+                    self.sendMessage();
                     setTimeout(function() { self._planResuming = false; }, 2000);
                 }
             });
@@ -2085,9 +2131,24 @@ function chatApp() {
             }
         },
 
-        scrollToBottom() {
+        scrollToBottom(force) {
             var el = document.getElementById('chat-messages');
-            if (el) el.scrollTop = el.scrollHeight;
+            if (!el) return;
+            var nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 100;
+            if (force || nearBottom) {
+                el.scrollTop = el.scrollHeight;
+                this.hasNewMessages = false;
+            } else {
+                // User is reading older messages — show "new message" indicator
+                this.hasNewMessages = true;
+            }
+        },
+
+        jumpToBottom() {
+            var el = document.getElementById('chat-messages');
+            if (!el) return;
+            el.scrollTop = el.scrollHeight;
+            this.hasNewMessages = false;
         }
     };
 }
