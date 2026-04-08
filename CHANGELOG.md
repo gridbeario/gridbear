@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-04-08
+
+### Fixed
+
+- **Cross-conversation message bug**: messages from one shared conversation could appear in another conversation if the user had switched. `user_message` events now include `conversation_id` and the frontend filters accordingly. Non-active conversations get an unread badge instead.
+- **Wrong sender on history reload**: in shared conversations, messages from other users were attributed to the current user after page reload because `get_messages` did not select `sender_id`. Fixed query to SELECT `sender_id` and JOIN `app.users` for display name.
+- **Shared conversation history access**: invited users could not load message history because `get_messages` used strict ownership check. Switched to `validate_conversation_access`.
+- **Plan Execute/Resume buttons did nothing**: passing argument to `sendMessage()` had no effect since it reads from `inputText`. Now sets `inputText` before calling.
+- **Pause-on-user-message removed**: was too aggressive, prevented users from answering agent questions during a task without pausing the plan. Manual pause from panel still works.
+- **Peggy "SKIP" bug on Telegram**: workflow `notification` step with `agent_id` + `prompt` passed the email summary as a new prompt to the agent, which then (confused by context) replied "SKIP". Fixed by switching `peggy_email_processor` workflow to template mode.
+
+### Improved
+
+- **Stricter planning instructions**: explicit workflow rules requiring `in_progress -> completed` transitions per task, no skipping. Helps the agent actually mark tasks as completed.
+- **Smart auto-scroll**: auto-scroll only triggers if user is already within 100px of bottom. Reading older messages no longer gets interrupted by new messages arriving.
+- **New messages bubble**: floating "New messages ↓" indicator appears when a message arrives while reading older content. Click to jump to bottom; auto-clears when user manually scrolls back.
+
 ## [0.7.1] - 2026-04-07
 
 ### Added
