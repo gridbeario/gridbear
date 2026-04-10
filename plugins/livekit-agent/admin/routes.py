@@ -261,23 +261,20 @@ async def list_active_calls(_=Depends(require_login)):
 
 
 def _get_agent_info(agent_id: str) -> dict:
-    """Get agent display name and avatar URL from YAML config."""
-    import yaml
-
-    agents_dir = BASE_DIR / "config" / "agents"
-    agent_path = agents_dir / f"{agent_id}.yaml"
-    if not agent_path.exists():
-        return {"name": agent_id.capitalize(), "avatar": ""}
+    """Get agent display name and avatar URL from DB config."""
     try:
-        with open(agent_path) as f:
-            config = yaml.safe_load(f) or {}
-        avatar = config.get("avatar", "")
-        return {
-            "name": config.get("name", agent_id.capitalize()),
-            "avatar": f"/static/avatars/{avatar}" if avatar else "",
-        }
+        from core.models.agent_config import AgentConfigRecord
+
+        record = AgentConfigRecord.get_sync(id=agent_id)
+        if record:
+            avatar = record.get("avatar", "")
+            return {
+                "name": record.get("name", agent_id.capitalize()),
+                "avatar": f"/static/avatars/{avatar}" if avatar else "",
+            }
     except Exception:
-        return {"name": agent_id.capitalize(), "avatar": ""}
+        pass
+    return {"name": agent_id.capitalize(), "avatar": ""}
 
 
 @router.get("/call/{room_name}", response_class=HTMLResponse)
@@ -288,11 +285,14 @@ async def call_page(room_name: str, request: Request):
     if session:
         # DB doesn't store agent_id; find first configured agent
         agent_info = {"name": "GridBear", "avatar": ""}
-        agents_dir = BASE_DIR / "config" / "agents"
-        if agents_dir.exists():
-            for agent_file in agents_dir.glob("*.yaml"):
-                agent_info = _get_agent_info(agent_file.stem)
-                break
+        try:
+            from core.models.agent_config import AgentConfigRecord
+
+            records = AgentConfigRecord.search_sync([("is_active", "=", True)])
+            if records:
+                agent_info = _get_agent_info(records[0].get("id", ""))
+        except Exception:
+            pass
 
         return templates.TemplateResponse(
             "call_standalone.html",

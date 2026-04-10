@@ -79,21 +79,15 @@ async def whatsapp_connect_page(
     user: dict = Depends(require_user),
 ):
     """Show WhatsApp QR code connection page with user instances."""
-    import yaml
+    from core.models.agent_config import AgentConfigRecord
 
-    BASE_DIR = ADMIN_DIR.parent
-    agents_dir = BASE_DIR / "config" / "agents"
     available_agents = []
 
-    for agent_file in sorted(agents_dir.glob("*.yaml")) + sorted(
-        agents_dir.glob("*.yml")
-    ):
-        try:
-            with open(agent_file) as f:
-                agent_data = yaml.safe_load(f)
-            if not agent_data:
-                continue
-            channels = agent_data.get("channels", {})
+    try:
+        records = AgentConfigRecord.search_sync([("is_active", "=", True)])
+        for record in records:
+            agent_data = dict(record)
+            channels = agent_data.get("channels") or {}
             if "whatsapp" in channels:
                 available_agents.append(
                     {
@@ -101,8 +95,8 @@ async def whatsapp_connect_page(
                         "name": agent_data.get("name", agent_data.get("id", "")),
                     }
                 )
-        except Exception:
-            pass
+    except Exception:
+        pass
 
     # Load user's personal instances from DB
     user_instances = []

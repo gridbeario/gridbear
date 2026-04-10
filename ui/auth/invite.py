@@ -7,15 +7,11 @@ and validates/consumes tokens for the password setup flow.
 import logging
 import secrets
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import bcrypt
-import yaml
 
 from core.config_models import PasswordToken
 from core.models.user import User
-
-AGENTS_DIR = Path(__file__).resolve().parent.parent.parent / "config" / "agents"
 
 logger = logging.getLogger(__name__)
 
@@ -107,18 +103,18 @@ def consume_token(token_id: int) -> bool:
 
 
 def get_agent_email_config(agent_id: str) -> dict | None:
-    """Read the email section from an agent's YAML config.
+    """Read the email section from an agent's DB config.
 
     Returns the email dict (account, sender_name, signature, etc.)
     or None if the agent has no email config.
     """
-    agent_path = AGENTS_DIR / f"{agent_id}.yaml"
-    if not agent_path.exists():
-        return None
     try:
-        with open(agent_path) as fh:
-            data = yaml.safe_load(fh) or {}
-        email_cfg = data.get("email")
+        from core.models.agent_config import AgentConfigRecord
+
+        record = AgentConfigRecord.get_sync(id=agent_id)
+        if not record:
+            return None
+        email_cfg = record.get("email") or {}
         if not email_cfg or not email_cfg.get("account"):
             return None
         return email_cfg

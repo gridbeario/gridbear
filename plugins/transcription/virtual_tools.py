@@ -43,7 +43,6 @@ _TOOLS = [
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 PLUGINS_DIR = BASE_DIR / "plugins"
-AGENTS_DIR = BASE_DIR / "config" / "agents"
 
 
 def _load_provider_class(provider_name: str):
@@ -80,25 +79,23 @@ def _load_provider_class(provider_name: str):
 
 
 def _get_agent_transcription_provider(agent_name: str | None) -> str | None:
-    """Read transcription.provider from the agent's YAML config.
+    """Read transcription.provider from the agent's DB config.
 
     Falls back to the base plugin's default_provider config.
     Returns None if no provider is configured anywhere.
     """
-    # 1) Agent YAML override
+    # 1) Agent DB override
     if agent_name:
-        agent_file = AGENTS_DIR / f"{agent_name}.yaml"
-        if agent_file.exists():
-            try:
-                import yaml
+        try:
+            from core.models.agent_config import AgentConfigRecord
 
-                with open(agent_file) as f:
-                    data = yaml.safe_load(f) or {}
-                provider = data.get("transcription", {}).get("provider")
+            record = AgentConfigRecord.get_sync(id=agent_name)
+            if record:
+                provider = (record.get("transcription") or {}).get("provider")
                 if provider:
                     return provider
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     # 2) Base plugin default_provider from DB config
     base_config = _get_provider_config("transcription")

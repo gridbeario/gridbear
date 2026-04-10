@@ -598,20 +598,17 @@ async def health_check():
 
 def get_agents_count() -> int:
     """Count configured agents."""
-    agents_dir = BASE_DIR / "config" / "agents"
-    if not agents_dir.exists():
+    try:
+        from core.models.agent_config import AgentConfigRecord
+
+        return len(AgentConfigRecord.search_sync([("is_active", "=", True)]))
+    except Exception:
         return 0
-    return len(list(agents_dir.glob("*.yaml")))
 
 
 def get_agents_list() -> list[dict]:
-    """Parse agent YAML configs and return list of agent metadata."""
-    import yaml
-
-    agents_dir = BASE_DIR / "config" / "agents"
+    """Return list of agent metadata from DB."""
     agents = []
-    if not agents_dir.exists():
-        return agents
 
     # Read global default_runner from SystemConfig
     global_default_runner = None
@@ -622,22 +619,26 @@ def get_agents_list() -> list[dict]:
     except Exception:
         pass
 
-    for yaml_file in sorted(agents_dir.glob("*.yaml")):
-        try:
-            with open(yaml_file) as f:
-                data = yaml.safe_load(f) or {}
-            channels = list(data.get("channels", {}).keys())
-            runner = data.get("runner") or global_default_runner
-            agents.append(
-                {
-                    "name": data.get("name", yaml_file.stem),
-                    "id": data.get("id", yaml_file.stem),
-                    "runner": runner,
-                    "channels": channels,
-                }
-            )
-        except Exception as exc:
-            logger.debug("Failed to parse agent config %s: %s", yaml_file.name, exc)
+    try:
+        from core.models.agent_config import AgentConfigRecord
+
+        records = AgentConfigRecord.search_sync([("is_active", "=", True)])
+    except Exception as exc:
+        logger.debug("Failed to load agent configs from DB: %s", exc)
+        return agents
+
+    for record in sorted(records, key=lambda r: r.get("id", "")):
+        data = dict(record)
+        channels = list((data.get("channels") or {}).keys())
+        runner = data.get("runner") or global_default_runner
+        agents.append(
+            {
+                "name": data.get("name", data.get("id", "")),
+                "id": data.get("id", ""),
+                "runner": runner,
+                "channels": channels,
+            }
+        )
     return agents
 
 
