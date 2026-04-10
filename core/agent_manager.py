@@ -142,6 +142,15 @@ class AgentManager:
         config.pop("updated_at", None)
         config.pop("is_active", None)
 
+        # Normalize services: ORM stores as list but from_dict expects dict
+        services = config.get("services")
+        if isinstance(services, list):
+            config["services"] = (
+                {s["name"]: s for s in services if isinstance(s, dict) and "name" in s}
+                if services
+                else {}
+            )
+
         # Resolve environment variables
         try:
             config = self._resolve_env_vars(config)
