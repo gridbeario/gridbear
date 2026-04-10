@@ -30,7 +30,17 @@
                     {{ schema.get('description', key) }}
                 </label>
 
-                {% if schema.get('enum') %}
+                {% if key == 'model' and runner_model_info is defined and runner_model_info.models %}
+                <select id="{{ key }}" name="{{ key }}"
+                        class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white focus:outline-none focus:border-nordic-500/50 transition-all">
+                    {% for m in runner_model_info.models %}
+                    <option value="{{ m.id }}" {% if current_value == m.id %}selected{% endif %}>
+                        {{ m.name or m.id }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                {% elif schema.get('enum') %}
                 <select id="{{ key }}" name="{{ key }}"
                         class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white focus:outline-none focus:border-nordic-500/50 transition-all">
                     {% for option in schema.enum %}

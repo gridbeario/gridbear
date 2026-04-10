@@ -2018,8 +2018,19 @@ async def _handle_message(msg: dict, session_id: str, request: Request) -> dict 
                 if matches_permission(_VAULT_SERVER_NAME, mcp_perms):
                     tools.extend(_VAULT_TOOLS)
 
-            # Add virtual tool provider tools (always available — they are local plugins)
+            # Add virtual tool provider tools (filtered by agent's enabled plugins)
+            agent_enabled_plugins = None
+            if agent_name:
+                acfg = _load_agent_config(agent_name)
+                if acfg:
+                    plugins_cfg = acfg.get("plugins", {})
+                    if isinstance(plugins_cfg, dict) and "enabled" in plugins_cfg:
+                        agent_enabled_plugins = set(plugins_cfg["enabled"])
             for provider in _local_tool_providers:
+                if agent_enabled_plugins is not None:
+                    server_name = provider.get_server_name()
+                    if server_name not in agent_enabled_plugins:
+                        continue
                 tools.extend(provider.get_tools())
 
             # Discover active platform names for enum injection

@@ -232,7 +232,12 @@ class OpenAICliBackend:
         if model:
             cmd.extend(["--model", model])
 
-        cmd.extend(["--full-auto", "--skip-git-repo-check"])
+        cmd.extend(
+            [
+                "--dangerously-bypass-approvals-and-sandbox",
+                "--skip-git-repo-check",
+            ]
+        )
         cmd.append(prompt)
 
         return cmd
