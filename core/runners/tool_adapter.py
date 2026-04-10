@@ -28,7 +28,7 @@ class BaseToolAdapter:
 
     def __init__(self, gateway_url: str | None = None):
         self._gateway_url = gateway_url or os.getenv(
-            "MCP_GATEWAY_URL", "http://gridbear-admin:8080"
+            "MCP_GATEWAY_URL", "http://gridbear-ui:8080"
         )
         self._session: aiohttp.ClientSession | None = None
         self._agent_id: str | None = None
