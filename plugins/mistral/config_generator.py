@@ -44,13 +44,14 @@ api_key_format = "Bearer {{token}}"
 def write_config(
     gateway_url: str | None = None,
     mcp_token_env: str = "GRIDBEAR_MCP_TOKEN",
+    model: str | None = None,
 ) -> bool:
     """Ensure ~/.vibe/config.toml has the MCP gateway server configured.
 
     Uses text-level surgery to avoid corrupting Vibe's complex TOML
     (nested tables like [tools.bash] break with parse+reserialize).
-    Only touches the marked gridbear-gateway block — leaves everything
-    else (active_model, models, tools, providers) untouched.
+    Only touches the marked gridbear-gateway block and active_model —
+    leaves everything else (models, tools, providers) untouched.
 
     Returns True if the file was written successfully.
     """
@@ -80,8 +81,49 @@ def write_config(
         else:
             text = text.rstrip() + "\n\n" + gw_block + "\n"
 
+        # Ensure auto_approve is true for programmatic mode
+        if re.search(r"^auto_approve\s*=\s*false", text, re.MULTILINE):
+            text = re.sub(
+                r"^auto_approve\s*=\s*false",
+                "auto_approve = true",
+                text,
+                count=1,
+                flags=re.MULTILINE,
+            )
+
+        # Update active_model if specified
+        if model:
+            if re.search(r"^active_model\s*=", text, re.MULTILINE):
+                text = re.sub(
+                    r'^active_model\s*=\s*"[^"]*"',
+                    f'active_model = "{model}"',
+                    text,
+                    count=1,
+                    flags=re.MULTILINE,
+                )
+            else:
+                text = f'active_model = "{model}"\n' + text
+
+            # Ensure model is defined in [[models]] section
+            if f'name = "{model}"' not in text:
+                model_block = (
+                    f"\n[[models]]\n"
+                    f'name = "{model}"\n'
+                    f'provider = "mistral"\n'
+                    f"temperature = 0.2\n"
+                )
+                # Insert before the gateway block marker if present
+                if _GW_BLOCK_MARKER in text:
+                    text = text.replace(
+                        _GW_BLOCK_MARKER,
+                        model_block + "\n" + _GW_BLOCK_MARKER,
+                        1,
+                    )
+                else:
+                    text = text.rstrip() + "\n" + model_block
+
         VIBE_CONFIG_PATH.write_text(text)
-        logger.debug("Wrote Vibe MCP config: gateway=%s", gw_url)
+        logger.debug("Wrote Vibe MCP config: gateway=%s, model=%s", gw_url, model)
         return True
     except OSError as e:
         logger.warning("Could not write %s: %s", VIBE_CONFIG_PATH, e)
