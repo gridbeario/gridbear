@@ -148,10 +148,49 @@
                     <p class="text-sm text-void-400">{{ _("No conversations") }}</p>
                 </div>
             </template>
-            <template x-for="conv in conversations" :key="conv.id">
+            <!-- Pinned conversations -->
+            <template x-for="conv in conversations.filter(function(c) { return c.pinned; })" :key="conv.id">
                 <div class="conv-item px-3 py-3 cursor-pointer flex items-start gap-2 group"
                      :class="activeConversationId === conv.id ? 'conv-active' : ''"
-                     @click="selectConversation(conv)">
+                     @click="selectConversation(conv)"
+                     @contextmenu.prevent="ctxMenu = { show: true, x: $event.clientX, y: $event.clientY, conv: conv }">
+                    <div class="flex-1 min-w-0 flex items-center gap-1.5">
+                        <i class="fas fa-thumbtack text-[9px] text-nordic-500 flex-shrink-0 -rotate-45"></i>
+                        <span x-show="conv.unread"
+                              class="w-2 h-2 rounded-full bg-nordic-500 flex-shrink-0"></span>
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium truncate flex items-center gap-1"
+                               :class="activeConversationId === conv.id ? 'text-nordic-700 dark:text-nordic-300' : conv.unread ? 'text-nordic-600 dark:text-nordic-400 font-semibold' : 'text-void-700 dark:text-void-300'">
+                                <i x-show="conv.type === 'shared'" class="fas fa-users text-[9px] text-void-400"></i>
+                                <span x-text="conv.title || i18n.newConversation" class="truncate"></span>
+                            </p>
+                            <p class="text-[10px] text-void-400 mt-0.5" x-text="formatDate(conv.updated_at)"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-0.5 flex-shrink-0 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                        <button @click.stop="togglePin(conv)"
+                                class="p-1 rounded-lg hover:bg-nordic-500/10 text-nordic-500 transition-all"
+                                title="{{ _("Unpin") }}">
+                            <i class="fas fa-thumbtack text-xs -rotate-45"></i>
+                        </button>
+                        <button @click.stop="ctxMenu = { show: true, x: $event.currentTarget.getBoundingClientRect().left, y: $event.currentTarget.getBoundingClientRect().bottom, conv: conv }"
+                                class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
+                                title="{{ _("More") }}">
+                            <i class="fas fa-ellipsis-vertical text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </template>
+            <!-- Separator between pinned and unpinned -->
+            <template x-if="conversations.some(function(c) { return c.pinned; }) && conversations.some(function(c) { return !c.pinned; })">
+                <div class="border-t border-void-200 dark:border-void-700 mx-3 my-1"></div>
+            </template>
+            <!-- Unpinned conversations -->
+            <template x-for="conv in conversations.filter(function(c) { return !c.pinned; })" :key="conv.id">
+                <div class="conv-item px-3 py-3 cursor-pointer flex items-start gap-2 group"
+                     :class="activeConversationId === conv.id ? 'conv-active' : ''"
+                     @click="selectConversation(conv)"
+                     @contextmenu.prevent="ctxMenu = { show: true, x: $event.clientX, y: $event.clientY, conv: conv }">
                     <div class="flex-1 min-w-0 flex items-center gap-1.5">
                         <span x-show="conv.unread"
                               class="w-2 h-2 rounded-full bg-nordic-500 flex-shrink-0"></span>
@@ -164,42 +203,16 @@
                             <p class="text-[10px] text-void-400 mt-0.5" x-text="formatDate(conv.updated_at)"></p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-0.5 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
-                        <button @click.stop="selectConversation(conv); contextPanelOpen = !contextPanelOpen"
-                                class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all relative"
-                                title="{{ _("Context") }}">
-                            <i class="fas fa-gear text-xs"></i>
-                            <span x-show="conv.id === activeConversationId && conversationContext"
-                                  class="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-nordic-500"></span>
-                        </button>
-                        <button @click.stop="selectConversation(conv); loadParticipants(); participantsPanelOpen = !participantsPanelOpen"
+                    <div class="flex items-center gap-0.5 flex-shrink-0 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                        <button @click.stop="togglePin(conv)"
                                 class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
-                                title="{{ _("Participants") }}">
-                            <i class="fas fa-users text-xs"></i>
+                                title="{{ _("Pin") }}">
+                            <i class="fas fa-thumbtack text-xs"></i>
                         </button>
-                        <button @click.stop="selectConversation(conv); loadDocuments(); docsPanelOpen = !docsPanelOpen"
-                                class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all relative"
-                                title="{{ _("Documents") }}">
-                            <i class="fas fa-file-lines text-xs"></i>
-                            <span x-show="conv.id === activeConversationId && conversationDocs.length > 0"
-                                  class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-nordic-500 text-white text-[8px] flex items-center justify-center"
-                                  x-text="conversationDocs.length"></span>
-                        </button>
-                        <button x-show="conv.has_plan || (conv.id === activeConversationId && currentPlan)"
-                                @click.stop="selectConversation(conv); loadPlan(); planPanelOpen = !planPanelOpen"
+                        <button @click.stop="ctxMenu = { show: true, x: $event.currentTarget.getBoundingClientRect().left, y: $event.currentTarget.getBoundingClientRect().bottom, conv: conv }"
                                 class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
-                                title="{{ _("Plan") }}">
-                            <i class="fas fa-list-check text-xs"></i>
-                        </button>
-                        <button @click.stop="renameConversation(conv)"
-                                class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
-                                title="{{ _("Rename") }}">
-                            <i class="fas fa-pen text-xs"></i>
-                        </button>
-                        <button @click.stop="deleteConversation(conv.id)"
-                                class="p-1 rounded-lg hover:bg-red-500/10 text-void-400 hover:text-red-500 transition-all"
-                                title="{{ _("Delete") }}">
-                            <i class="fas fa-trash-can text-xs"></i>
+                                title="{{ _("More") }}">
+                            <i class="fas fa-ellipsis-vertical text-xs"></i>
                         </button>
                     </div>
                 </div>
@@ -226,6 +239,51 @@
                 <i class="fas" :class="ttsEnabled ? 'fa-volume-high' : 'fa-volume-xmark'"></i>
             </button>
         </div>
+    </div>
+
+    <!-- Context menu for conversations -->
+    <div x-show="ctxMenu.show" x-cloak
+         @click.away="ctxMenu.show = false"
+         @keydown.escape.window="ctxMenu.show = false"
+         class="fixed z-50 bg-white dark:bg-void-800 border border-void-200 dark:border-void-700 rounded-lg shadow-lg py-1 min-w-[160px]"
+         :style="'left:' + ctxMenu.x + 'px;top:' + ctxMenu.y + 'px'">
+        <button @click="if(ctxMenu.conv) togglePin(ctxMenu.conv); ctxMenu.show = false"
+                class="w-full px-3 py-2 text-left text-sm hover:bg-void-100 dark:hover:bg-void-700 flex items-center gap-2">
+            <i class="fas fa-thumbtack text-xs" :class="ctxMenu.conv && ctxMenu.conv.pinned ? 'text-nordic-500 -rotate-45' : 'text-void-400'"></i>
+            <span x-text="ctxMenu.conv && ctxMenu.conv.pinned ? '{{ _("Unpin") }}' : '{{ _("Pin") }}'"></span>
+        </button>
+        <button @click="if(ctxMenu.conv) { selectConversation(ctxMenu.conv); contextPanelOpen = true; } ctxMenu.show = false"
+                class="w-full px-3 py-2 text-left text-sm hover:bg-void-100 dark:hover:bg-void-700 flex items-center gap-2">
+            <i class="fas fa-gear text-xs text-void-400"></i>
+            <span>{{ _("Context") }}</span>
+        </button>
+        <button @click="if(ctxMenu.conv) { selectConversation(ctxMenu.conv); loadParticipants(); participantsPanelOpen = true; } ctxMenu.show = false"
+                class="w-full px-3 py-2 text-left text-sm hover:bg-void-100 dark:hover:bg-void-700 flex items-center gap-2">
+            <i class="fas fa-users text-xs text-void-400"></i>
+            <span>{{ _("Participants") }}</span>
+        </button>
+        <button @click="if(ctxMenu.conv) { selectConversation(ctxMenu.conv); loadDocuments(); docsPanelOpen = true; } ctxMenu.show = false"
+                class="w-full px-3 py-2 text-left text-sm hover:bg-void-100 dark:hover:bg-void-700 flex items-center gap-2">
+            <i class="fas fa-file-lines text-xs text-void-400"></i>
+            <span>{{ _("Documents") }}</span>
+        </button>
+        <button x-show="ctxMenu.conv && (ctxMenu.conv.has_plan || (ctxMenu.conv.id === activeConversationId && currentPlan))"
+                @click="if(ctxMenu.conv) { selectConversation(ctxMenu.conv); loadPlan(); planPanelOpen = true; } ctxMenu.show = false"
+                class="w-full px-3 py-2 text-left text-sm hover:bg-void-100 dark:hover:bg-void-700 flex items-center gap-2">
+            <i class="fas fa-list-check text-xs text-void-400"></i>
+            <span>{{ _("Plan") }}</span>
+        </button>
+        <button @click="if(ctxMenu.conv) renameConversation(ctxMenu.conv); ctxMenu.show = false"
+                class="w-full px-3 py-2 text-left text-sm hover:bg-void-100 dark:hover:bg-void-700 flex items-center gap-2">
+            <i class="fas fa-pen text-xs text-void-400"></i>
+            <span>{{ _("Rename") }}</span>
+        </button>
+        <div class="border-t border-void-200 dark:border-void-700 my-1"></div>
+        <button @click="if(ctxMenu.conv) deleteConversation(ctxMenu.conv.id); ctxMenu.show = false"
+                class="w-full px-3 py-2 text-left text-sm hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 flex items-center gap-2">
+            <i class="fas fa-trash-can text-xs"></i>
+            <span>{{ _("Delete") }}</span>
+        </button>
     </div>
 
     <!-- Chat area -->
@@ -347,18 +405,28 @@
                         </template>
                         <template x-for="doc in conversationDocs" :key="doc.id">
                             <div class="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-void-50 dark:hover:bg-void-800/30 group">
-                                <div class="flex items-center gap-2 min-w-0">
+                                <a :href="'/me/chat/api/conversations/' + activeConversationId + '/documents/' + doc.id + '/download'"
+                                   :download="doc.original_filename"
+                                   class="flex items-center gap-2 min-w-0 flex-1 hover:text-nordic-500 transition-colors">
                                     <i class="fas fa-file text-void-400 text-xs flex-shrink-0"></i>
                                     <div class="min-w-0">
                                         <div class="text-xs truncate" x-text="doc.original_filename"></div>
                                         <div class="text-[10px] text-void-400" x-text="formatFileSize(doc.file_size)"></div>
                                     </div>
+                                </a>
+                                <div class="flex items-center gap-0.5 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                                    <a :href="'/me/chat/api/conversations/' + activeConversationId + '/documents/' + doc.id + '/download'"
+                                       target="_blank"
+                                       class="p-1 rounded-lg hover:bg-nordic-500/10 text-void-400 hover:text-nordic-500 transition-all"
+                                       title="{{ _('Download') }}">
+                                        <i class="fas fa-download text-[10px]"></i>
+                                    </a>
+                                    <button @click="deleteDocument(doc.id)"
+                                            class="p-1 rounded-lg hover:bg-red-500/10 text-void-400 hover:text-red-500 transition-all"
+                                            title="{{ _('Remove') }}">
+                                        <i class="fas fa-trash-can text-[10px]"></i>
+                                    </button>
                                 </div>
-                                <button @click="deleteDocument(doc.id)"
-                                        class="p-1 rounded-lg hover:bg-red-500/10 text-void-400 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
-                                        title="{{ _('Remove') }}">
-                                    <i class="fas fa-trash-can text-[10px]"></i>
-                                </button>
                             </div>
                         </template>
                         <template x-if="docsUploading">
@@ -711,6 +779,7 @@ function chatApp() {
 
         conversations: [],
         activeConversationId: null,
+        ctxMenu: { show: false, x: 0, y: 0, conv: null },
         sidebarLoading: false,
         messagesLoading: false,
         creatingConversation: false,
@@ -781,6 +850,24 @@ function chatApp() {
             }
             this.loadConversations();
 
+            // PWA standalone: intercept external links to open in system browser
+            // (otherwise they open inside the PWA frame and the user gets stuck)
+            var isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true;
+            if (isStandalone) {
+                document.addEventListener('click', function(e) {
+                    var anchor = e.target.closest('a[target="_blank"]');
+                    if (!anchor) return;
+                    // Skip download links — handled by browser save dialog
+                    if (anchor.hasAttribute('download')) return;
+                    var href = anchor.getAttribute('href');
+                    if (!href || !href.match(/^https?:/)) return;
+                    e.preventDefault();
+                    // Force open in system browser via window.open without name
+                    window.open(href, '_blank', 'noopener,noreferrer');
+                });
+            }
+
             // Reset hasNewMessages when user manually scrolls to bottom
             setTimeout(function() {
                 var msgEl = document.getElementById('chat-messages');
@@ -839,10 +926,16 @@ function chatApp() {
             if (!text) return '';
             // Highlight @mentions
             text = text.replace(/@(\w+)/g, '<span class="text-nordic-500 font-semibold">@$1</span>');
+            var html;
             if (typeof marked !== 'undefined') {
-                return marked.parse(text);
+                html = marked.parse(text);
+            } else {
+                html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
             }
-            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+            // Add target="_blank" + rel to all external links so the global
+            // click handler can intercept them when running as a standalone PWA
+            html = html.replace(/<a\s+href="(https?:[^"]+)"/g, '<a href="$1" target="_blank" rel="noopener noreferrer external"');
+            return html;
         },
 
         // --- File handling ---
@@ -1093,6 +1186,22 @@ function chatApp() {
             });
         },
 
+        togglePin(conv) {
+            var self = this;
+            var action = conv.pinned ? 'unpin' : 'pin';
+            fetch('/me/chat/api/conversations/' + conv.id + '/' + action, {
+                method: 'POST',
+                headers: self._apiHeaders(),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    conv.pinned = !conv.pinned;
+                    self.loadConversations();
+                }
+            });
+        },
+
         // --- WebSocket ---
 
         connect() {
@@ -1125,7 +1234,7 @@ function chatApp() {
                     self.isTyping = false;
                     var agentName = data.agent || self.selectedAgent;
                     var agentMentionedMe = (data.text || '').toLowerCase().indexOf('@{{ user.username }}') !== -1;
-                    self._notify(self.agentNames[agentName] || agentName, (data.text || '').substring(0, 100), agentMentionedMe);
+                    self._notify(self.agentNames[agentName] || agentName, (data.text || '').substring(0, 100), agentMentionedMe, self.activeConversationId);
                     self.messages.push({
                         id: ++self.msgCounter,
                         role: 'agent',
@@ -1219,16 +1328,17 @@ function chatApp() {
                     if (data.conversation_id && data.conversation_id !== self.activeConversationId) {
                         // Mark the other conversation as unread and notify
                         var mentioned = (data.text || '').toLowerCase().indexOf('@{{ user.username }}') !== -1;
-                        self._notify(data.display_name || data.sender, (data.text || '').substring(0, 100), mentioned);
+                        self._notify(data.display_name || data.sender, (data.text || '').substring(0, 100), mentioned, data.conversation_id);
                         for (var i = 0; i < self.conversations.length; i++) {
                             if (self.conversations[i].id === data.conversation_id) {
                                 self.conversations[i].unread = true;
                                 break;
                             }
                         }
+                        self._bubbleConversation(data.conversation_id);
                     } else {
                         var mentioned = (data.text || '').toLowerCase().indexOf('@{{ user.username }}') !== -1;
-                        self._notify(data.display_name || data.sender, (data.text || '').substring(0, 100), mentioned);
+                        self._notify(data.display_name || data.sender, (data.text || '').substring(0, 100), mentioned, data.conversation_id || self.activeConversationId);
                         self.messages.push({
                             id: ++self.msgCounter,
                             role: 'other_user',
@@ -1269,10 +1379,11 @@ function chatApp() {
                         for (var i = 0; i < self.conversations.length; i++) {
                             if (self.conversations[i].id === data.conversation_id) {
                                 self.conversations[i].unread = true;
-                                self._notify('New message', self.conversations[i].title || 'New message in conversation', true);
+                                self._notify('New message', self.conversations[i].title || 'New message in conversation', true, data.conversation_id);
                                 break;
                             }
                         }
+                        self._bubbleConversation(data.conversation_id);
                     }
                 } else if (data.type === 'conversation_update') {
                     // Update title in sidebar
@@ -1734,10 +1845,18 @@ function chatApp() {
             });
         },
 
-        _notify(title, body, force) {
+        _notify(title, body, force, convId) {
             if ('Notification' in window && Notification.permission === 'granted' && (document.hidden || force)) {
-                var n = new Notification(title, { body: body, icon: '/static/img/logo.svg', tag: 'webchat-' + Date.now() });
-                n.onclick = function() { window.focus(); n.close(); };
+                var self = this;
+                var n = new Notification(title, { body: body, icon: '/static/img/logo.svg', tag: 'webchat-' + (convId || Date.now()) });
+                n.onclick = function() {
+                    window.focus();
+                    n.close();
+                    if (convId) {
+                        var conv = self.conversations.find(function(c) { return c.id === convId; });
+                        if (conv) self.selectConversation(conv);
+                    }
+                };
             }
         },
 
@@ -2082,23 +2201,38 @@ function chatApp() {
             return chunks;
         },
 
-        _bubbleConversation() {
-            // Move active conversation to top of list and update timestamp
+        _bubbleConversation(convId) {
+            // Move a conversation to top of its section (pinned or unpinned)
             var self = this;
-            if (!self.activeConversationId) return;
+            var targetId = convId || self.activeConversationId;
+            if (!targetId) return;
             var idx = -1;
             for (var i = 0; i < self.conversations.length; i++) {
-                if (self.conversations[i].id === self.activeConversationId) {
+                if (self.conversations[i].id === targetId) {
                     idx = i;
                     break;
                 }
             }
+            if (idx < 0) return;
+            var conv = self.conversations[idx];
+            conv.updated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
             if (idx > 0) {
-                var conv = self.conversations.splice(idx, 1)[0];
-                conv.updated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
-                self.conversations.unshift(conv);
-            } else if (idx === 0) {
-                self.conversations[0].updated_at = new Date().toISOString().replace('T', ' ').substring(0, 19);
+                self.conversations.splice(idx, 1);
+                // Insert at top of the correct section (pinned stay with pinned)
+                if (conv.pinned) {
+                    self.conversations.unshift(conv);
+                } else {
+                    // Insert after last pinned conversation
+                    var insertAt = 0;
+                    for (var j = 0; j < self.conversations.length; j++) {
+                        if (self.conversations[j].pinned) {
+                            insertAt = j + 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    self.conversations.splice(insertAt, 0, conv);
+                }
             }
         },
 
@@ -2125,7 +2259,13 @@ function chatApp() {
             if (!ts) return '';
             try {
                 var d = new Date(ts.replace(' ', 'T'));
-                return d.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'});
+                var now = new Date();
+                var time = d.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'});
+                if (d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+                    return time;
+                }
+                var date = d.toLocaleDateString('it-IT', {day: 'numeric', month: 'short'});
+                return date + ' ' + time;
             } catch(e) {
                 return '';
             }
