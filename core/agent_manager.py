@@ -7,9 +7,6 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import jsonschema
-import yaml
-
 from config.logging_config import logger
 from core.agent import Agent, AgentConfig, AgentState
 from core.exceptions import AgentNotFoundError, AgentStartupError, AgentUnavailableError
@@ -41,69 +38,21 @@ class AgentManager:
 
     def __init__(
         self,
-        agents_dir: Path,
         plugin_manager: "PluginManager",
+        agents_dir: Path | None = None,
         schema_path: Path | None = None,
     ):
         """Initialize AgentManager.
 
         Args:
-            agents_dir: Directory containing agent YAML configurations
             plugin_manager: Shared plugin manager instance
-            schema_path: Path to agent JSON schema for validation
+            agents_dir: Deprecated, kept for backward compatibility
+            schema_path: Deprecated, kept for backward compatibility
         """
-        self.agents_dir = agents_dir
         self.plugin_manager = plugin_manager
-        self.schema_path = schema_path or (
-            agents_dir.parent / "schemas" / "agent.schema.json"
-        )
         self._agents: dict[str, Agent] = {}
-        self._schema: dict | None = None
         self._health_check_task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
-
-    def _load_schema(self) -> dict | None:
-        """Load JSON schema for agent validation."""
-        if self._schema is not None:
-            return self._schema
-
-        if not self.schema_path.exists():
-            logger.warning(f"Agent schema not found: {self.schema_path}")
-            return None
-
-        try:
-            import json
-
-            with open(self.schema_path) as f:
-                self._schema = json.load(f)
-            logger.debug(f"Loaded agent schema from {self.schema_path}")
-            return self._schema
-        except Exception as e:
-            logger.error(f"Failed to load agent schema: {e}")
-            return None
-
-    def _validate_config(self, config: dict, filename: str) -> bool:
-        """Validate agent configuration against JSON schema.
-
-        Args:
-            config: Parsed YAML configuration
-            filename: Source filename for error messages
-
-        Returns:
-            True if valid, False otherwise
-        """
-        schema = self._load_schema()
-        if schema is None:
-            logger.warning(f"Skipping validation for {filename} (no schema)")
-            return True
-
-        try:
-            jsonschema.validate(instance=config, schema=schema)
-            return True
-        except jsonschema.ValidationError as e:
-            logger.error(f"Agent config validation failed for {filename}: {e.message}")
-            logger.error(f"  Path: {'.'.join(str(p) for p in e.absolute_path)}")
-            return False
 
     def _resolve_env_vars(self, config: dict) -> dict:
         """Resolve ${ENV_VAR} references in configuration.
@@ -139,71 +88,65 @@ class AgentManager:
         return resolve_value(config)
 
     async def load_all(self) -> list[Agent]:
-        """Load all agent configurations from agents directory.
+        """Load all active agent configurations from the database.
 
         Returns:
             List of loaded Agent instances
         """
-        if not self.agents_dir.exists():
-            logger.warning(f"Agents directory does not exist: {self.agents_dir}")
-            return []
+        from core.models.agent_config import AgentConfigRecord
 
-        yaml_files = list(self.agents_dir.glob("*.yaml")) + list(
-            self.agents_dir.glob("*.yml")
+        records = AgentConfigRecord.search_sync(
+            [("is_active", "=", True)],
+            order="id ASC",
         )
 
-        if not yaml_files:
-            logger.info("No agent configuration files found")
-            return []
-
         loaded_agents = []
-        for yaml_file in yaml_files:
-            # Skip template files
-            if yaml_file.stem.startswith("_"):
-                continue
-
+        for record in records:
             try:
-                agent = await self._load_agent(yaml_file)
+                agent = await self._load_agent(record["id"])
                 if agent:
                     self._agents[agent.name] = agent
                     loaded_agents.append(agent)
             except Exception as e:
-                logger.error(f"Failed to load agent from {yaml_file.name}: {e}")
+                logger.error("Failed to load agent %s: %s", record["id"], e)
 
-        logger.info(f"Loaded {len(loaded_agents)} agent(s)")
+        logger.info(
+            "Loaded %d agent(s): %s",
+            len(loaded_agents),
+            [a.name for a in loaded_agents],
+        )
         return loaded_agents
 
-    async def _load_agent(self, config_path: Path) -> Agent | None:
-        """Load a single agent from YAML configuration.
+    async def _load_agent(self, agent_id: str) -> Agent | None:
+        """Load a single agent from the database.
 
         Args:
-            config_path: Path to YAML configuration file
+            agent_id: Agent ID in the database
 
         Returns:
             Agent instance or None if loading failed
         """
-        logger.debug(f"Loading agent from {config_path.name}")
+        from core.models.agent_config import AgentConfigRecord
 
-        try:
-            with open(config_path) as f:
-                raw_config = yaml.safe_load(f)
-        except yaml.YAMLError as e:
-            logger.error(f"YAML parse error in {config_path.name}: {e}")
+        logger.debug("Loading agent from DB: %s", agent_id)
+
+        record = AgentConfigRecord.get_sync(id=agent_id)
+        if not record:
+            logger.warning("Agent %s not found in DB", agent_id)
             return None
 
-        if not raw_config:
-            logger.error(f"Empty configuration in {config_path.name}")
-            return None
-
-        # Validate against schema
-        if not self._validate_config(raw_config, config_path.name):
-            return None
+        # Build config dict compatible with AgentConfig.from_dict()
+        config = dict(record)
+        # Remove ORM metadata fields not needed by AgentConfig
+        config.pop("created_at", None)
+        config.pop("updated_at", None)
+        config.pop("is_active", None)
 
         # Resolve environment variables
         try:
-            config = self._resolve_env_vars(raw_config)
+            config = self._resolve_env_vars(config)
         except ValueError as e:
-            logger.error(f"Environment variable error in {config_path.name}: {e}")
+            logger.error("Environment variable error for agent %s: %s", agent_id, e)
             return None
 
         # Create AgentConfig
@@ -214,10 +157,10 @@ class AgentManager:
         for mcp in agent_config.mcp_permissions:
             if mcp != "*" and mcp not in available_mcp:
                 logger.warning(
-                    f"Agent {agent_config.name}: MCP server '{mcp}' not found"
+                    "Agent %s: MCP server '%s' not found", agent_config.name, mcp
                 )
 
-        # Create Agent instance (pass raw_config for email settings etc.)
+        # Create Agent instance
         agent = Agent(
             config=agent_config,
             plugin_manager=self.plugin_manager,
@@ -228,15 +171,17 @@ class AgentManager:
         try:
             await self._create_agent_services(agent)
         except AgentStartupError as e:
-            logger.error(f"Agent {agent_config.name}: {e}")
+            logger.error("Agent %s: %s", agent_config.name, e)
             return None
 
         # Create channels for this agent
         await self._create_agent_channels(agent)
 
         logger.info(
-            f"Loaded agent: {agent.display_name} ({agent.name}) "
-            f"with {len(agent._channels)} channel(s)"
+            "Loaded agent: %s (%s) with %d channel(s)",
+            agent.display_name,
+            agent.name,
+            len(agent._channels),
         )
         return agent
 
@@ -552,9 +497,9 @@ class AgentManager:
         return await self.start_agent(name)
 
     async def reload_all(self, handler_factory=None) -> dict:
-        """Reload all agents from YAML configurations.
+        """Reload all agents from the database.
 
-        Stops all agents, clears them, reloads YAML files, and restarts.
+        Stops all agents, clears them, reloads from DB, and restarts.
 
         Args:
             handler_factory: Optional callable to set message handlers.
@@ -574,7 +519,7 @@ class AgentManager:
             self._agents.clear()
             self._stop_event.clear()
 
-            # Reload all agents from YAML
+            # Reload all agents from DB
             logger.info("Reload: Loading agent configurations...")
             agents = await self.load_all()
             result["agents_loaded"] = len(agents)

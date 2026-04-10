@@ -1185,12 +1185,10 @@ async def main():
 
     stop_event = asyncio.Event()
 
-    # Load agents from config/agents/*.yaml
-    agents_dir = BASE_DIR / "config" / "agents"
+    # Load agents from database
     from core.agent_manager import AgentManager
 
     agent_manager = AgentManager(
-        agents_dir=agents_dir,
         plugin_manager=plugin_manager,
     )
     set_agent_manager(agent_manager)

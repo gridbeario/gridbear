@@ -103,7 +103,7 @@ def _bootstrap_runtime():
     from core.agent_manager import AgentManager
     from core.registry import set_agent_manager
 
-    am = AgentManager(agents_dir=BASE_DIR / "config" / "agents", plugin_manager=pm)
+    am = AgentManager(plugin_manager=pm)
     asyncio.get_event_loop().run_until_complete(am.load_all())
     set_agent_manager(am)
     namespace["am"] = am
