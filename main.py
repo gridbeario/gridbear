@@ -1303,6 +1303,21 @@ async def main():
         api_server = uvicorn.Server(api_config)
         api_task = asyncio.create_task(api_server.serve())
         logger.info("Internal API started on port 8000")
+
+        # Start UI app on port 8080 (unified container — single process)
+        ui_port = int(os.getenv("UI_PORT", "8080"))
+        if os.getenv("UI_ENABLED", "true").lower() != "false":
+            try:
+                from ui.app import app as ui_app
+
+                ui_config = uvicorn.Config(
+                    ui_app, host="0.0.0.0", port=ui_port, log_level="warning"
+                )
+                ui_server = uvicorn.Server(ui_config)
+                asyncio.create_task(ui_server.serve())
+                logger.info("Admin UI started on port %d", ui_port)
+            except Exception as e:
+                logger.warning("Admin UI failed to start: %s", e)
     except Exception as e:
         logger.error(f"Failed to start internal API: {e}")
 

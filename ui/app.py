@@ -872,26 +872,37 @@ async def startup_cleanup():
     _preflight_check()
     app.state.start_time = time.time()
 
-    # Initialize PostgreSQL (required — _preflight_check guarantees DATABASE_URL)
+    # Check if DB is already initialized (embedded in core container)
+    from core.registry import get_database
+
+    existing_db = get_database()
+    embedded = existing_db is not None
+
+    # Initialize PostgreSQL (skip if already done by core container)
     database_url = os.environ.get("DATABASE_URL")
     try:
-        from core.database import DatabaseManager
-        from core.registry import set_database
+        if embedded:
+            db_manager = existing_db
+            logger.info("Admin: reusing existing PostgreSQL connection (embedded mode)")
+        else:
+            from core.database import DatabaseManager
+            from core.registry import set_database
 
-        db_manager = DatabaseManager(database_url)
-        await db_manager.initialize()
-        set_database(db_manager)
-        logger.info("Admin: PostgreSQL connection pool initialized")
+            db_manager = DatabaseManager(database_url)
+            await db_manager.initialize()
+            set_database(db_manager)
+            logger.info("Admin: PostgreSQL connection pool initialized")
 
-        # Attach DB log handler for WARNING+ persistence
-        from config.logging_config import attach_db_log_handler
+        if not embedded:
+            # Attach DB log handler for WARNING+ persistence
+            from config.logging_config import attach_db_log_handler
 
-        attach_db_log_handler()
+            attach_db_log_handler()
 
-        # Initialize ORM: inject DB, discover models, run auto-migrations
-        from core.orm import Registry as ORMRegistry
+            # Initialize ORM: inject DB, discover models, run auto-migrations
+            from core.orm import Registry as ORMRegistry
 
-        ORMRegistry.initialize(db_manager)
+            ORMRegistry.initialize(db_manager)
 
         # Initialize AuthDatabase (applies migration DDL)
         init_auth_db()
@@ -916,24 +927,25 @@ async def startup_cleanup():
         reset_secrets_manager()
         logger.info("Admin: SecretsManager re-initialized with PostgreSQL")
 
-        # One-time migrations: config files -> PostgreSQL
-        from core.config_migration import (
-            migrate_admin_config_to_db,
-            migrate_claude_settings_to_db,
-            migrate_mcp_perms_to_unified_id,
-            migrate_rest_api_config_to_db,
-            migrate_unify_users,
-            migrate_user_platforms,
-        )
+        if not embedded:
+            # One-time migrations (already done by core in embedded mode)
+            from core.config_migration import (
+                migrate_admin_config_to_db,
+                migrate_claude_settings_to_db,
+                migrate_mcp_perms_to_unified_id,
+                migrate_rest_api_config_to_db,
+                migrate_unify_users,
+                migrate_user_platforms,
+            )
 
-        await migrate_admin_config_to_db(BASE_DIR / "config" / "admin_config.json")
-        await migrate_rest_api_config_to_db(BASE_DIR / "config" / "rest_api.json")
-        await migrate_claude_settings_to_db(
-            BASE_DIR / "config" / "claude_settings.json"
-        )
-        await migrate_mcp_perms_to_unified_id()
-        await migrate_unify_users()
-        await migrate_user_platforms()
+            await migrate_admin_config_to_db(BASE_DIR / "config" / "admin_config.json")
+            await migrate_rest_api_config_to_db(BASE_DIR / "config" / "rest_api.json")
+            await migrate_claude_settings_to_db(
+                BASE_DIR / "config" / "claude_settings.json"
+            )
+            await migrate_mcp_perms_to_unified_id()
+            await migrate_unify_users()
+            await migrate_user_platforms()
 
         # Reload template loader now that DB is available (theme from SystemConfig)
         rebuild_template_loader()
@@ -992,8 +1004,8 @@ async def startup_cleanup():
 
     asyncio.create_task(_notification_cleanup_loop())
 
-    # Initialize MCP Gateway client manager (skipped when core container serves MCP)
-    if os.getenv("MCP_GATEWAY_ENABLED", "true").lower() != "false":
+    # Initialize MCP Gateway client manager (skipped in embedded mode or when disabled)
+    if not embedded and os.getenv("MCP_GATEWAY_ENABLED", "true").lower() != "false":
         from core.mcp_gateway import server as mcp_server
         from core.mcp_gateway.client_manager import MCPClientManager
 
