@@ -25,7 +25,7 @@ services:
       - EXTRA_PLUGINS_DIRS=${EXTRA_PLUGINS_DIRS:-}
       - VERBOSE_AGENT_LOG=${VERBOSE_AGENT_LOG:-true}
       - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-}
-      - MCP_GATEWAY_URL=http://gridbear-ui:8080
+      - MCP_GATEWAY_URL=http://localhost:8000
       - DATABASE_URL=postgresql://gridbear:${POSTGRES_PASSWORD}@gridbear-postgres:5432/gridbear
       - GRIDBEAR_GATEWAY_URL=http://gridbear-ui:8080
     expose:

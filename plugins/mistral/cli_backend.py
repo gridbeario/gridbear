@@ -39,7 +39,7 @@ class MistralCliBackend:
         self.max_retries = int(config.get("max_retries", 2))
         self.max_tool_iterations = int(config.get("max_tool_iterations", 20))
         self.max_price = float(config.get("max_price", 1.0))
-        self._gateway_url = os.getenv("MCP_GATEWAY_URL", "http://gridbear-ui:8080")
+        self._gateway_url = os.getenv("MCP_GATEWAY_URL", "http://localhost:8000")
         self._vibe_bin = _find_vibe_binary()
 
         if not self._vibe_bin:

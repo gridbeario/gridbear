@@ -7,7 +7,7 @@ import httpx
 from config.logging_config import logger
 
 # The UI container URL -- same env var used by MCP Gateway config
-_UI_URL = os.getenv("MCP_GATEWAY_URL", "http://gridbear-ui:8080")
+_UI_URL = os.getenv("MCP_GATEWAY_URL", "http://localhost:8000")
 _SECRET = os.getenv("INTERNAL_API_SECRET", "")
 
 

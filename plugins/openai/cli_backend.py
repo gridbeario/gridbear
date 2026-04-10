@@ -43,7 +43,7 @@ class OpenAICliBackend:
         self.model = config.get("model", os.getenv("OPENAI_MODEL", ""))
         self.timeout = config.get("timeout", 120)
         self.max_retries = config.get("max_retries", 2)
-        self._gateway_url = os.getenv("MCP_GATEWAY_URL", "http://gridbear-ui:8080")
+        self._gateway_url = os.getenv("MCP_GATEWAY_URL", "http://localhost:8000")
         self._codex_bin = _find_codex_binary()
 
     async def run(
