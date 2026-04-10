@@ -357,6 +357,7 @@ async def list_conversations(request: Request, user: dict = Depends(require_user
             cur = conn.execute(
                 """SELECT c.id, c.agent_name, c.title, c.created_at,
                           c.updated_at, c.type, c.context_prompt,
+                          p.pinned_at,
                           EXISTS(
                               SELECT 1 FROM chat.webchat_plans pl
                               WHERE pl.conversation_id = c.id
@@ -366,13 +367,15 @@ async def list_conversations(request: Request, user: dict = Depends(require_user
                    JOIN chat.webchat_participants p
                         ON c.id = p.conversation_id
                    WHERE p.unified_id = %s AND c.agent_name = %s
-                   ORDER BY c.updated_at DESC""",
+                   ORDER BY p.pinned_at IS NULL, p.pinned_at ASC,
+                            c.updated_at DESC""",
                 (uid, agent),
             )
         else:
             cur = conn.execute(
                 """SELECT c.id, c.agent_name, c.title, c.created_at,
                           c.updated_at, c.type, c.context_prompt,
+                          p.pinned_at,
                           EXISTS(
                               SELECT 1 FROM chat.webchat_plans pl
                               WHERE pl.conversation_id = c.id
@@ -382,10 +385,15 @@ async def list_conversations(request: Request, user: dict = Depends(require_user
                    JOIN chat.webchat_participants p
                         ON c.id = p.conversation_id
                    WHERE p.unified_id = %s
-                   ORDER BY c.updated_at DESC""",
+                   ORDER BY p.pinned_at IS NULL, p.pinned_at ASC,
+                            c.updated_at DESC""",
                 (uid,),
             )
-        rows = [_serialize_row(dict(r)) for r in cur.fetchall()]
+        rows = []
+        for r in cur.fetchall():
+            row = _serialize_row(dict(r))
+            row["pinned"] = row.get("pinned_at") is not None
+            rows.append(row)
     return api_ok(data={"conversations": rows})
 
 
@@ -457,13 +465,15 @@ async def get_messages(
 
     with _db.acquire_sync() as conn:
         cur = conn.execute(
-            """SELECT m.id, m.role, m.content, m.metadata_json, m.created_at,
-                      m.sender_id, u.display_name as sender_display_name
-               FROM chat.webchat_messages m
-               LEFT JOIN app.users u ON u.username = m.sender_id
-               WHERE m.conversation_id = %s
-               ORDER BY m.created_at ASC
-               LIMIT %s OFFSET %s""",
+            """SELECT * FROM (
+                   SELECT m.id, m.role, m.content, m.metadata_json, m.created_at,
+                          m.sender_id, u.display_name as sender_display_name
+                   FROM chat.webchat_messages m
+                   LEFT JOIN app.users u ON u.username = m.sender_id
+                   WHERE m.conversation_id = %s
+                   ORDER BY m.created_at DESC
+                   LIMIT %s OFFSET %s
+               ) sub ORDER BY sub.created_at ASC""",
             (conv_id, limit, offset),
         )
         rows = []
@@ -879,6 +889,53 @@ async def remove_participant(
     return api_ok()
 
 
+# --- Pin / Unpin ---
+
+
+@router.post(
+    "/conversations/{conv_id}/pin",
+    response_model=ApiResponse,
+    response_model_exclude_none=True,
+)
+async def pin_conversation(conv_id: str, user: dict = Depends(require_user)):
+    """Pin a conversation to the top of the list for this user."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(404, "Not found", "not_found")
+
+    with _db.acquire_sync() as conn:
+        conn.execute(
+            "UPDATE chat.webchat_participants SET pinned_at = NOW() "
+            "WHERE conversation_id = %s AND unified_id = %s AND pinned_at IS NULL",
+            (conv_id, uid),
+        )
+        conn.commit()
+    return api_ok()
+
+
+@router.post(
+    "/conversations/{conv_id}/unpin",
+    response_model=ApiResponse,
+    response_model_exclude_none=True,
+)
+async def unpin_conversation(conv_id: str, user: dict = Depends(require_user)):
+    """Unpin a conversation."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(404, "Not found", "not_found")
+
+    with _db.acquire_sync() as conn:
+        conn.execute(
+            "UPDATE chat.webchat_participants SET pinned_at = NULL "
+            "WHERE conversation_id = %s AND unified_id = %s",
+            (conv_id, uid),
+        )
+        conn.commit()
+    return api_ok()
+
+
 # --- File upload ---
 
 
@@ -1131,6 +1188,38 @@ async def delete_document(
         pass
 
     return api_ok()
+
+
+@router.get("/conversations/{conv_id}/documents/{doc_id}/download")
+async def download_document(
+    conv_id: str, doc_id: str, user: dict = Depends(require_user)
+):
+    """Download a conversation document. Any participant can download."""
+    _ensure_db()
+    uid = _uid(user)
+    if not validate_conversation_access(conv_id, uid):
+        return api_error(403, "Access denied", "forbidden")
+
+    with _db.acquire_sync() as conn:
+        row = conn.execute(
+            "SELECT original_filename, file_path, mime_type "
+            "FROM chat.webchat_documents "
+            "WHERE id = %s AND conversation_id = %s",
+            (doc_id, conv_id),
+        ).fetchone()
+
+    if not row:
+        return api_error(404, "Document not found", "not_found")
+
+    file_path = Path(row["file_path"])
+    if not file_path.exists():
+        return api_error(404, "File no longer available", "not_found")
+
+    return FileResponse(
+        file_path,
+        media_type=row["mime_type"] or "application/octet-stream",
+        filename=row["original_filename"],
+    )
 
 
 def get_conversation_documents(conversation_id: str) -> list[dict]:
