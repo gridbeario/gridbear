@@ -307,38 +307,36 @@ def _filter_by_agent_prefs(tools: list[dict], agent_name: str) -> list[dict]:
 
 
 # Agent config cache (populated on first access, cleared on provider refresh)
-_agent_config_cache: dict[str, dict] = {}
+_agent_config_cache: dict[str, tuple[float, dict]] = {}
+_AGENT_CONFIG_TTL = 10  # seconds
 
 
 def _load_agent_config(agent_name: str) -> dict | None:
-    """Load agent YAML config with simple cache.
+    """Load agent config from DB with short TTL cache.
 
     Used as a fallback when the runner doesn't send tool_loading/max_tools
     in the JSON-RPC params (e.g. Claude CLI process pool).
     """
-    if agent_name in _agent_config_cache:
-        return _agent_config_cache[agent_name]
+    import time
 
-    try:
-        from pathlib import Path
+    now = time.time()
+    cached = _agent_config_cache.get(agent_name)
+    if cached and (now - cached[0]) < _AGENT_CONFIG_TTL:
+        return cached[1]
 
-        import yaml
+    from core.models.agent_config import AgentConfigRecord
 
-        agents_dir = Path(__file__).resolve().parent.parent.parent / "config" / "agents"
-        agent_path = agents_dir / f"{agent_name}.yaml"
-        if not agent_path.exists():
-            _agent_config_cache[agent_name] = {}
-            return {}
-        with open(agent_path) as f:
-            cfg = yaml.safe_load(f) or {}
-        _agent_config_cache[agent_name] = cfg
-        return cfg
-    except Exception:
+    record = AgentConfigRecord.get_sync(id=agent_name)
+    if not record:
         return None
+
+    config = dict(record)
+    _agent_config_cache[agent_name] = (now, config)
+    return config
 
 
 def invalidate_agent_config_cache(agent_name: str | None = None) -> None:
-    """Clear cached agent config (called on agent reload)."""
+    """Invalidate agent config cache. Called on reload."""
     if agent_name:
         _agent_config_cache.pop(agent_name, None)
     else:
