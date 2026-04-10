@@ -506,6 +506,30 @@ async def health(
     )
 
 
+@router.post("/agents/{agent_id}/reload")
+async def reload_agent_endpoint(
+    agent_id: str,
+    _auth: None = Depends(verify_internal_auth),
+):
+    """Reload a single agent from DB config. Called by UI after config save."""
+    from core.registry import get_agent_manager
+
+    manager = get_agent_manager()
+    if not manager:
+        return JSONResponse(
+            {"ok": False, "error": "Agent manager not available"},
+            status_code=500,
+        )
+
+    success = await manager.reload_agent(agent_id)
+    if success:
+        return JSONResponse({"ok": True})
+    return JSONResponse(
+        {"ok": False, "error": f"Failed to reload {agent_id}"},
+        status_code=500,
+    )
+
+
 async def _single_event(event: dict):
     """Yield a single NDJSON event (for error responses)."""
     yield json.dumps(event) + "\n"

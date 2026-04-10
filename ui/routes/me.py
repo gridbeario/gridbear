@@ -50,48 +50,36 @@ def _get_user_agents(user: dict) -> list[dict]:
     Superadmins see all agents.  Regular users only see agents that
     list their username in at least one channel's allowed_users.
     """
-    agents_dir = BASE_DIR / "config" / "agents"
-    agents = []
-    if not agents_dir.exists():
-        return agents
+    from core.models.agent_config import AgentConfigRecord
 
+    agents = []
     username = (user.get("username") or "").lower()
     is_superadmin = user.get("is_superadmin", False)
 
-    for agent_file in sorted(agents_dir.glob("*.yaml")):
-        try:
-            import yaml
+    try:
+        records = AgentConfigRecord.search_sync([("is_active", "=", True)])
+    except Exception:
+        return agents
 
-            with open(agent_file) as f:
-                agent_config = yaml.safe_load(f) or {}
+    for record in sorted(records, key=lambda r: r.get("id", "")):
+        agent_config = dict(record)
 
-            # Access check: superadmins see all, others must be listed
-            # in at least one channel's allowed_users.  Agents without
-            # any allowed_users (e.g. internal-only) are admin-only.
-            if not is_superadmin:
-                allowed = _get_allowed_users(agent_config)
-                if not allowed or username not in allowed:
-                    continue
+        # Access check: superadmins see all, others must be listed
+        # in at least one channel's allowed_users.  Agents without
+        # any allowed_users (e.g. internal-only) are admin-only.
+        if not is_superadmin:
+            allowed = _get_allowed_users(agent_config)
+            if not allowed or username not in allowed:
+                continue
 
-            agents.append(
-                {
-                    "name": agent_file.stem,
-                    "display_name": agent_config.get(
-                        "name", agent_config.get("display_name", agent_file.stem)
-                    ),
-                    "description": agent_config.get("description", ""),
-                    "avatar": agent_config.get("avatar", ""),
-                }
-            )
-        except Exception:
-            agents.append(
-                {
-                    "name": agent_file.stem,
-                    "display_name": agent_file.stem,
-                    "description": "",
-                    "avatar": "",
-                }
-            )
+        agents.append(
+            {
+                "name": agent_config.get("id", ""),
+                "display_name": agent_config.get("name", agent_config.get("id", "")),
+                "description": agent_config.get("description", ""),
+                "avatar": agent_config.get("avatar", ""),
+            }
+        )
 
     # Sort by last conversation activity (most recent first)
     if agents:

@@ -47,48 +47,40 @@ async def _evolution_request(method: str, path: str, **kwargs) -> dict | None:
 
 
 async def _get_instances_status() -> list[dict]:
-    """Get status of all WhatsApp instances (YAML + user instances)."""
+    """Get status of all WhatsApp instances (DB + user instances)."""
     instances = []
 
-    # YAML-configured instances
-    agents_dir = BASE_DIR / "config" / "agents"
-    if agents_dir.exists():
-        import yaml
+    # DB-configured instances
+    try:
+        from core.models.agent_config import AgentConfigRecord
 
-        for agent_file in sorted(agents_dir.glob("*.yaml")) + sorted(
-            agents_dir.glob("*.yml")
-        ):
-            try:
-                with open(agent_file) as f:
-                    agent_data = yaml.safe_load(f)
-                if not agent_data:
-                    continue
-                channels = agent_data.get("channels", {})
-                if "whatsapp" in channels:
-                    wa_config = channels["whatsapp"]
-                    instance_name = wa_config.get(
-                        "instance_name", agent_data.get("id", "")
-                    )
-                    agent_name = agent_data.get("name", agent_data.get("id", ""))
+        records = AgentConfigRecord.search_sync([("is_active", "=", True)])
+        for record in records:
+            agent_data = dict(record)
+            channels = agent_data.get("channels") or {}
+            if "whatsapp" in channels:
+                wa_config = channels["whatsapp"]
+                instance_name = wa_config.get("instance_name", agent_data.get("id", ""))
+                agent_name = agent_data.get("name", agent_data.get("id", ""))
 
-                    status_data = await _evolution_request(
-                        "GET", f"/instance/connectionState/{instance_name}"
-                    )
-                    state = "unknown"
-                    if status_data and "error" not in status_data:
-                        state = status_data.get("instance", {}).get("state", "unknown")
+                status_data = await _evolution_request(
+                    "GET", f"/instance/connectionState/{instance_name}"
+                )
+                state = "unknown"
+                if status_data and "error" not in status_data:
+                    state = status_data.get("instance", {}).get("state", "unknown")
 
-                    instances.append(
-                        {
-                            "instance_name": instance_name,
-                            "agent_name": agent_name,
-                            "state": state,
-                            "connected": state == "open",
-                            "user_instance": False,
-                        }
-                    )
-            except Exception:
-                pass
+                instances.append(
+                    {
+                        "instance_name": instance_name,
+                        "agent_name": agent_name,
+                        "state": state,
+                        "connected": state == "open",
+                        "user_instance": False,
+                    }
+                )
+    except Exception:
+        pass
 
     # User-created instances from DB
     try:

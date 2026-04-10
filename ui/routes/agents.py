@@ -2,16 +2,18 @@
 
 import asyncio
 import json
+import logging
+import os
 from pathlib import Path
 
-import yaml
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from ui.routes.auth import require_login
 
+logger = logging.getLogger(__name__)
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-AGENTS_DIR = BASE_DIR / "config" / "agents"
 AVATARS_DIR = BASE_DIR / "ui" / "static" / "avatars"
 ALLOWED_AVATAR_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
@@ -140,55 +142,53 @@ def get_mcp_server_names_for_plugin(plugin_name: str, manifest: dict) -> list[st
 
 
 def load_agent(agent_id: str) -> dict | None:
-    """Load an agent configuration."""
-    agent_path = AGENTS_DIR / f"{agent_id}.yaml"
-    if not agent_path.exists():
-        return None
+    """Load agent config from DB."""
+    from core.models.agent_config import AgentConfigRecord
 
-    with open(agent_path) as f:
-        return yaml.safe_load(f)
+    record = AgentConfigRecord.get_sync(id=agent_id)
+    if not record:
+        return None
+    return dict(record)
 
 
 def save_agent(agent_id: str, config: dict) -> None:
-    """Save an agent configuration."""
-    AGENTS_DIR.mkdir(parents=True, exist_ok=True)
-    agent_path = AGENTS_DIR / f"{agent_id}.yaml"
+    """Save agent config to DB."""
+    from core.models.agent_config import AgentConfigRecord
 
-    with open(agent_path, "w") as f:
-        yaml.dump(
-            config, f, default_flow_style=False, allow_unicode=True, sort_keys=False
-        )
+    data = {k: v for k, v in config.items() if k != "id"}
+    AgentConfigRecord.create_or_update_sync(
+        _conflict_fields=("id",),
+        id=agent_id,
+        **data,
+    )
 
 
 def list_agents() -> list[dict]:
-    """List all agent configurations."""
+    """List all agents from DB."""
+    from core.models.agent_config import AgentConfigRecord
+
+    records = AgentConfigRecord.search_sync(order="id ASC")
     agents = []
-
-    if not AGENTS_DIR.exists():
-        return agents
-
-    for agent_file in AGENTS_DIR.glob("*.yaml"):
-        try:
-            with open(agent_file) as f:
-                config = yaml.safe_load(f)
-                if config:
-                    agents.append(
-                        {
-                            "id": config.get("id", agent_file.stem),
-                            "name": config.get("name", agent_file.stem.title()),
-                            "description": config.get("description", ""),
-                            "channels": list(config.get("channels", {}).keys()),
-                            "plugins": config.get("plugins", {}).get("enabled", []),
-                            "mcp_permissions": config.get("mcp_permissions", []),
-                            "locale": config.get("locale", "en"),
-                            "avatar": config.get("avatar", ""),
-                            "max_tools": config.get("max_tools"),
-                            "tool_loading": config.get("tool_loading", "full"),
-                        }
-                    )
-        except Exception:
-            pass
-
+    for record in records:
+        config = dict(record)
+        channels = config.get("channels") or {}
+        plugins = config.get("plugins") or {}
+        agents.append(
+            {
+                "id": config.get("id", ""),
+                "name": config.get("name", ""),
+                "description": config.get("description", ""),
+                "channels": list(channels.keys()) if isinstance(channels, dict) else [],
+                "plugins": plugins.get("enabled", [])
+                if isinstance(plugins, dict)
+                else [],
+                "mcp_permissions": config.get("mcp_permissions", []),
+                "locale": config.get("locale", "en"),
+                "avatar": config.get("avatar", ""),
+                "max_tools": config.get("max_tools"),
+                "tool_loading": config.get("tool_loading", "full"),
+            }
+        )
     return agents
 
 
@@ -536,7 +536,6 @@ async def save_agent_config(
         "timezone": timezone,
     }
 
-    # Only write runner/model to YAML if set (keeps YAML clean)
     if runner.strip():
         config["runner"] = runner.strip()
     if fallback_runner.strip():
@@ -604,6 +603,20 @@ async def save_agent_config(
 
     save_agent(agent_id, config)
 
+    # Signal bot container to reload this agent
+    gridbear_url = os.getenv("GRIDBEAR_URL", "http://gridbear:8000")
+    secret = os.getenv("INTERNAL_API_SECRET", "")
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(
+                f"{gridbear_url}/api/agents/{agent_id}/reload",
+                headers={"Authorization": f"Bearer {secret}"},
+            )
+    except Exception as exc:
+        logger.warning("Failed to signal agent reload for %s: %s", agent_id, exc)
+
     return RedirectResponse(url="/agents/", status_code=303)
 
 
@@ -612,11 +625,27 @@ async def delete_agent(
     request: Request, agent_id: str, _: dict = Depends(require_login)
 ):
     """Delete an agent."""
-    agent_path = AGENTS_DIR / f"{agent_id}.yaml"
-    if agent_path.exists():
-        agent_path.unlink()
+    from core.models.agent_config import AgentConfigRecord
+
+    AgentConfigRecord.delete_sync(agent_id)
 
     # Clean up avatar files
     _delete_avatar_files(agent_id)
+
+    # Signal bot container to reload all agents
+    gridbear_url = os.getenv("GRIDBEAR_URL", "http://gridbear:8000")
+    secret = os.getenv("INTERNAL_API_SECRET", "")
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(
+                f"{gridbear_url}/api/agents/{agent_id}/reload",
+                headers={"Authorization": f"Bearer {secret}"},
+            )
+    except Exception as exc:
+        logger.warning(
+            "Failed to signal agent reload after delete %s: %s", agent_id, exc
+        )
 
     return RedirectResponse(url="/agents/", status_code=303)

@@ -132,6 +132,25 @@ class OpenAIRunner(BaseRunner):
             model: Per-agent model override
             no_tools: If True, run without MCP tools
         """
+        # Fresh config from DB for hot-reload (per-agent override takes priority)
+        effective_model = model
+        if not effective_model:
+            try:
+                from core.orm.model import get_database
+
+                _db = get_database()
+                with _db.acquire_sync() as conn:
+                    row = conn.execute(
+                        "SELECT config FROM app.plugin_registry WHERE name = %s",
+                        ("openai",),
+                    ).fetchone()
+                if row and row["config"]:
+                    effective_model = row["config"].get("model", self.model)
+            except Exception:
+                pass
+            if not effective_model:
+                effective_model = self.model
+
         # --- API backend dispatch ---
         if self.backend == "api" and self._api_backend:
             return await self._api_backend.run(
@@ -142,7 +161,7 @@ class OpenAIRunner(BaseRunner):
                 tool_callback=tool_callback,
                 stream_callback=stream_callback,
                 agent_id=agent_id,
-                model=model,
+                model=effective_model,
                 no_tools=no_tools,
                 **kwargs,
             )
@@ -157,7 +176,7 @@ class OpenAIRunner(BaseRunner):
                 tool_callback=tool_callback,
                 stream_callback=stream_callback,
                 agent_id=agent_id,
-                model=model,
+                model=effective_model,
                 no_tools=no_tools,
                 **kwargs,
             )

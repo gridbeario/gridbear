@@ -139,7 +139,25 @@ class GeminiRunner(BaseRunner):
                 await error_callback("runner_error", msg)
             return RunnerResponse(text=msg, is_error=True)
 
-        effective_model = model or self.model
+        # Fresh config from DB for hot-reload (per-agent override takes priority)
+        effective_model = model
+        if not effective_model:
+            try:
+                from core.orm.model import get_database
+
+                _db = get_database()
+                with _db.acquire_sync() as conn:
+                    row = conn.execute(
+                        "SELECT config FROM app.plugin_registry WHERE name = %s",
+                        ("gemini",),
+                    ).fetchone()
+                if row and row["config"]:
+                    effective_model = row["config"].get("model", self.model)
+            except Exception:
+                pass
+            if not effective_model:
+                effective_model = self.model
+
         agent_label = agent_id or "default"
 
         logger.info(

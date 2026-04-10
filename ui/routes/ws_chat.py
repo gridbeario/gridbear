@@ -8,7 +8,6 @@ Routes messages through GridBear's internal API for full pipeline processing
 import asyncio
 import json
 import os
-from pathlib import Path
 
 import aiohttp
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -109,21 +108,14 @@ async def push_to_webchat(uid: str, event: dict) -> bool:
         return False
 
 
-_AGENTS_DIR = Path(__file__).resolve().parent.parent.parent / "config" / "agents"
-
-
 def _load_agent_yaml(agent_name: str) -> dict | None:
-    """Load an agent YAML config by name. Returns None if not found."""
-    import yaml
+    """Load agent config from DB."""
+    from core.models.agent_config import AgentConfigRecord
 
-    path = _AGENTS_DIR / f"{agent_name}.yaml"
-    if not path.exists():
+    record = AgentConfigRecord.get_sync(id=agent_name)
+    if not record:
         return None
-    try:
-        with open(path) as f:
-            return yaml.safe_load(f) or {}
-    except Exception:
-        return None
+    return dict(record)
 
 
 async def _authenticate_ws(websocket: WebSocket) -> dict | None:
