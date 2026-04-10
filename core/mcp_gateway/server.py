@@ -1267,6 +1267,17 @@ async def _handle_search_tools(
     if unified_id:
         all_tools = _filter_by_user_prefs(all_tools, unified_id)
 
+    # Log post-filter breakdown
+    post_by_server = {}
+    for t in all_tools:
+        prefix = t["name"].split("__", 1)[0] if "__" in t["name"] else "builtin"
+        post_by_server[prefix] = post_by_server.get(prefix, 0) + 1
+    logger.info(
+        "search_tools: post-filter %d tools: %s",
+        len(all_tools),
+        ", ".join(f"{k}:{v}" for k, v in sorted(post_by_server.items())),
+    )
+
     # Score and rank tools
     keywords = query.split()
     scored: list[tuple[float, dict, str]] = []
@@ -2018,18 +2029,24 @@ async def _handle_message(msg: dict, session_id: str, request: Request) -> dict 
                 if matches_permission(_VAULT_SERVER_NAME, mcp_perms):
                     tools.extend(_VAULT_TOOLS)
 
-            # Add virtual tool provider tools (filtered by agent's enabled plugins)
-            agent_enabled_plugins = None
+            # Add virtual tool provider tools (filtered by agent config)
+            # Include if: in plugins.enabled OR in mcp_permissions
+            agent_allowed_vtp = None
             if agent_name:
                 acfg = _load_agent_config(agent_name)
                 if acfg:
+                    allowed = set()
                     plugins_cfg = acfg.get("plugins", {})
                     if isinstance(plugins_cfg, dict) and "enabled" in plugins_cfg:
-                        agent_enabled_plugins = set(plugins_cfg["enabled"])
+                        allowed.update(plugins_cfg["enabled"])
+                    agent_perms = acfg.get("mcp_permissions", [])
+                    if isinstance(agent_perms, list):
+                        allowed.update(agent_perms)
+                    agent_allowed_vtp = allowed
             for provider in _local_tool_providers:
-                if agent_enabled_plugins is not None:
+                if agent_allowed_vtp is not None:
                     server_name = provider.get_server_name()
-                    if server_name not in agent_enabled_plugins:
+                    if server_name not in agent_allowed_vtp:
                         continue
                 tools.extend(provider.get_tools())
 

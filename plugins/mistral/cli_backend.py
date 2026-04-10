@@ -82,10 +82,10 @@ class MistralCliBackend:
         unified_id = kwargs.get("unified_id")
         if not no_tools and agent_id:
             self._prepare_mcp_token(agent_id, unified_id=unified_id)
-            # Ensure Vibe TOML has MCP server config pointing to gateway
+            # Ensure Vibe TOML has MCP server config + correct model
             from .config_generator import write_config
 
-            write_config(gateway_url=self._gateway_url)
+            write_config(gateway_url=self._gateway_url, model=effective_model)
 
         cmd = self._build_command(prompt=prompt)
         logger.debug("Running vibe: %d args, prompt_len=%d", len(cmd), len(prompt))
