@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-04-11
+
+### Architecture
+
+- **Unified container**: Bot, MCP Gateway, REST API, and Admin UI now run in a single container/process. The `gridbear-ui` service is removed from docker-compose. The UI serves on port 8080 within the same process, with embedded mode that reuses the core's DB connection and skips duplicate initialization.
+- **Core autonomy**: MCP Gateway, REST API, and OAuth2 discovery endpoints are mounted on the core's internal API (port 8000). The bot no longer depends on the UI container for tool access.
+- **Agent config in DB**: All agent configuration (personality, runner, model, channels, MCP permissions, plugins) migrated from YAML files to PostgreSQL (`app.agent_configs` table via ORM). YAML files auto-migrated and renamed to `.migrated` on first boot.
+
+### Added
+
+- **AgentConfigRecord ORM model**: Full agent configuration persisted in DB with all fields (personality, channels, voice, email, MCP permissions, plugins, context options)
+- **Agent hot-reload**: `POST /api/agents/{id}/reload` endpoint for instant config changes without restart. Atomic swap (new agent created before old one stopped)
+- **Runner config hot-reload**: Runners re-read model/timeout from DB on every invocation — no restart needed for config changes
+- **Webchat conversation pinning**: Pin/unpin conversations to top of sidebar (per-user via `pinned_at` on participants table). Visual separator between pinned and unpinned sections
+- **Webchat context menu**: Right-click (desktop) or long-press (mobile) for Pin, Context, Participants, Documents, Plan, Rename, Delete. Reduced inline buttons from 7 to 2 (pin + ellipsis)
+- **Webchat notification navigation**: Clicking a notification opens the correct conversation instead of just focusing the window
+- **ORM models for webchat**: `WebchatConversation`, `WebchatParticipant`, `WebchatMessage`, `WebchatDocument` models with auto-migration
+- **Virtual tool provider filtering**: VTP plugins filtered by agent's `plugins.enabled` AND `mcp_permissions` — disabled plugins no longer contribute tools
+- **MCP_GATEWAY_ENABLED env var**: Controls MCP Gateway initialization per-container for safe migration
+
+### Fixed
+
+- **Codex CLI MCP tool calls**: `--full-auto` only approves shell commands, not MCP tools. Switched to `--dangerously-bypass-approvals-and-sandbox` (safe in Docker sandbox)
+- **Vibe CLI model selection**: Vibe was ignoring agent model config (always using `devstral-2`). Now `write_config()` updates `active_model` and adds missing model definitions
+- **Vibe CLI auto-approve**: MCP tool calls silently rejected without approval. Set `auto_approve = true` in config for programmatic mode
+- **Message loading truncation**: `LIMIT 200` loaded oldest messages instead of most recent. Fixed with DESC subquery + ASC wrapper
+- **Message timestamps**: Show date + time for messages from previous days (was time-only)
+- **Conversation auto-reorder**: Sidebar conversations move to top when new messages arrive, respecting pin sections
+- **Stale hostname references**: Fixed `gridbear-admin:8080` → `gridbear-ui:8080` in 3 files
+- **Company-specific placeholders**: Replaced hardcoded Dubhe references in agent config UI with generic examples
+- **Plugin config model dropdown**: Uses models registry (76 models from API) instead of hardcoded manifest enum (10 models)
+
+### Removed
+
+- **`gridbear-ui` service**: Removed from docker-compose (unified into gridbear container)
+- **Agent YAML files**: Migrated to DB, no longer read at runtime
+- **JSON schema validation**: Removed `config/schemas/agent.schema.json` (ORM handles validation)
+- **`config/mcp_servers.json.example`**: MCP config is fully dynamic
+
 ## [0.7.2] - 2026-04-08
 
 ### Fixed
