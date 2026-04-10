@@ -1294,6 +1294,7 @@ async def main():
         internal_app = create_internal_app(
             plugin_manager=plugin_manager,
             mount_mcp=(mcp_client_manager is not None),
+            mount_rest_api=True,
         )
         internal_app.state.bot_start_time = time.time()
         api_config = uvicorn.Config(
