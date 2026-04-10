@@ -15,6 +15,8 @@ import json
 import logging
 from pathlib import Path
 
+import yaml
+
 logger = logging.getLogger(__name__)
 
 _MARKER_KEY = "_migration_admin_config"
@@ -837,3 +839,107 @@ async def migrate_user_platforms() -> bool:
     await SystemConfig.set_param(_MARKER_USER_PLATFORMS, True)
     logger.info("User platforms migration complete (user_identities → user_platforms)")
     return True
+
+
+async def migrate_agent_configs_to_db() -> None:
+    """Migrate agent YAML files to app.agent_configs DB table.
+
+    Idempotent: checks _migrations marker, skips existing records,
+    renames migrated files to .migrated.
+    """
+    from core.models.agent_config import AgentConfigRecord
+    from core.orm.model import get_database
+
+    db = get_database()
+
+    # Check migration marker
+    with db.acquire_sync() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM public._migrations WHERE name = %s",
+            ("_migration_agent_configs",),
+        ).fetchone()
+        if row:
+            conn.rollback()
+            logger.info("Agent config migration already applied, skipping")
+            return
+        conn.rollback()
+
+    agents_dir = Path(__file__).resolve().parent.parent / "config" / "agents"
+    if not agents_dir.exists():
+        logger.info("No agents directory found, skipping agent config migration")
+        return
+
+    yaml_files = sorted(agents_dir.glob("*.yaml"))
+    if not yaml_files:
+        logger.info("No agent YAML files found, skipping migration")
+        return
+
+    migrated_count = 0
+    for yaml_file in yaml_files:
+        try:
+            with open(yaml_file) as f:
+                data = yaml.safe_load(f)
+
+            if not data or not isinstance(data, dict):
+                logger.warning("Skipping invalid YAML: %s", yaml_file.name)
+                continue
+
+            agent_id = data.get("id", yaml_file.stem)
+
+            # Skip if already in DB
+            existing = AgentConfigRecord.get_sync(id=agent_id)
+            if existing:
+                logger.info("Agent %s already in DB, skipping", agent_id)
+                continue
+
+            # Normalize plugins field
+            plugins_cfg = data.get("plugins", {})
+            if isinstance(plugins_cfg, list):
+                plugins_cfg = {"enabled": plugins_cfg}
+            elif not isinstance(plugins_cfg, dict):
+                plugins_cfg = {}
+
+            AgentConfigRecord.create_sync(
+                id=agent_id,
+                name=data.get("name", agent_id),
+                description=data.get("description", ""),
+                personality=data.get("personality", ""),
+                locale=data.get("locale", "en"),
+                timezone=data.get("timezone", "UTC"),
+                runner=data.get("runner", "claude"),
+                model=data.get("model", ""),
+                fallback_runner=data.get("fallback_runner", ""),
+                tool_loading=data.get("tool_loading", "full"),
+                max_tools=int(data.get("max_tools", 0)),
+                avatar=data.get("avatar", ""),
+                is_active=True,
+                channels=data.get("channels") or {},
+                services=data.get("services") or [],
+                voice=data.get("voice") or {},
+                image=data.get("image") or {},
+                email=data.get("email") or {},
+                mcp_permissions=data.get("mcp_permissions") or [],
+                plugins=plugins_cfg,
+                context_options=data.get("context_options") or {},
+            )
+
+            # Rename to .migrated
+            migrated_path = yaml_file.with_suffix(".migrated")
+            yaml_file.rename(migrated_path)
+            migrated_count += 1
+            logger.info("Migrated agent %s to DB", agent_id)
+
+        except Exception as e:
+            logger.error("Failed to migrate %s: %s", yaml_file.name, e)
+
+    # Record migration marker
+    if migrated_count > 0:
+        with db.acquire_sync() as conn:
+            conn.execute(
+                "INSERT INTO public._migrations (name) VALUES (%s) "
+                "ON CONFLICT DO NOTHING",
+                ("_migration_agent_configs",),
+            )
+            conn.commit()
+
+    logger.info("Agent config migration: %d agents migrated to DB", migrated_count)

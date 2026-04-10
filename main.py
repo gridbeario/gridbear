@@ -1122,6 +1122,7 @@ async def main():
             # One-time migrations: config files -> PostgreSQL
             from core.config_migration import (
                 migrate_admin_config_to_db,
+                migrate_agent_configs_to_db,
                 migrate_claude_settings_to_db,
                 migrate_create_default_company,
                 migrate_mcp_perms_to_unified_id,
@@ -1139,6 +1140,7 @@ async def main():
             await migrate_create_default_company()
             await migrate_unify_users()
             await migrate_user_platforms()
+            await migrate_agent_configs_to_db()
         except Exception as e:
             logger.error(f"PostgreSQL initialization failed: {e}")
             raise
