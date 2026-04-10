@@ -617,15 +617,40 @@ def _discover_plugin_api_routes(app: FastAPI, plugin_manager) -> None:
             )
 
 
-def create_app(plugin_manager=None) -> FastAPI:
+def create_app(plugin_manager=None, mount_mcp=False, mount_rest_api=False) -> FastAPI:
     """Create the internal API FastAPI application.
 
     Args:
         plugin_manager: If provided, discovers and mounts plugin API routes
             from plugins/{name}/api/routes.py.
+        mount_mcp: If True, mounts MCP Gateway routes on this app.
+        mount_rest_api: If True, mounts REST API routes on this app.
     """
     app = FastAPI(title="GridBear Internal API", docs_url=None, redoc_url=None)
     app.include_router(router)
+
+    if mount_mcp:
+        from core.mcp_gateway.server import router as mcp_gateway_router
+
+        app.include_router(mcp_gateway_router, tags=["mcp"])
+        logger.info("MCP Gateway routes mounted on internal API")
+
+    if mount_rest_api:
+        try:
+            from core.rest_api.router import router as rest_api_router
+
+            app.include_router(rest_api_router, tags=["rest-api"])
+            logger.info("REST API mounted on core container")
+        except Exception as e:
+            logger.warning("REST API not available: %s", e)
+
+    # OAuth2 discovery (read-only, always available)
+    try:
+        from core.oauth2.discovery import router as oauth2_discovery_router
+
+        app.include_router(oauth2_discovery_router, tags=["oauth2"])
+    except Exception as e:
+        logger.warning("OAuth2 discovery not available: %s", e)
 
     if plugin_manager:
         _discover_plugin_api_routes(app, plugin_manager)

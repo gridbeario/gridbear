@@ -15,6 +15,8 @@ from datetime import datetime, timedelta, timezone
 
 from config.logging_config import logger
 
+PG_SCHEMA = "admin"  # OAuth2 tables live in admin schema
+
 
 def _parse_utc(val) -> datetime:
     """Parse datetime value, handling both strings and datetime objects."""
@@ -260,8 +262,6 @@ def _init_pg(db) -> None:
         ).fetchone()
         if row:
             return
-
-        from ui.secrets_manager import PG_SCHEMA
 
         conn.execute(PG_SCHEMA)
         conn.execute(

@@ -57,7 +57,7 @@ def write_config(
     """
     import re
 
-    gw_url = gateway_url or os.getenv("MCP_GATEWAY_URL", "http://gridbear-ui:8080")
+    gw_url = gateway_url or os.getenv("MCP_GATEWAY_URL", "http://localhost:8000")
 
     gw_block = _GW_TEMPLATE.format(
         marker=_GW_BLOCK_MARKER,

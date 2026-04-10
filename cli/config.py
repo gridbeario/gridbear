@@ -9,7 +9,7 @@ CONFIG_DIR = Path(
     os.environ.get("GRIDBEAR_CONFIG_DIR", "~/.config/gridbear")
 ).expanduser()
 
-DEFAULT_GATEWAY_URL = "http://localhost:8088"
+DEFAULT_GATEWAY_URL = "http://localhost:8000"
 
 
 @dataclass
@@ -36,6 +36,7 @@ def load_config(**overrides) -> CLIConfig:
 
     gateway_url = (
         overrides.get("gateway_url")
+        or os.environ.get("GRIDBEAR_URL")
         or os.environ.get("GRIDBEAR_GATEWAY_URL")
         or conn.get("gateway_url")
         or DEFAULT_GATEWAY_URL

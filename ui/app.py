@@ -841,75 +841,7 @@ async def dashboard(request: Request, _: dict = Depends(require_login)):
     )
 
 
-def _discover_local_tool_providers(mcp_server) -> None:
-    """Discover and register LocalToolProvider instances from plugins.
-
-    Scans enabled plugins for a 'virtual_tools' entry in manifest.json.
-    Uses the path resolver to find plugins across multiple directories.
-    """
-    import importlib.util
-
-    from core.registry import get_path_resolver
-
-    resolver = get_path_resolver()
-
-    from ui.plugin_helpers import get_enabled_plugins
-
-    enabled = get_enabled_plugins()
-    if not enabled:
-        return
-
-    all_manifests = resolver.discover_all() if resolver else {}
-    providers = []
-
-    for plugin_name in enabled:
-        manifest = all_manifests.get(plugin_name)
-        if manifest is None:
-            continue
-
-        vt_file = manifest.get("virtual_tools")
-        if not vt_file:
-            continue
-
-        plugin_dir = resolver.resolve(plugin_name) if resolver else None
-        if plugin_dir is None:
-            continue
-
-        vt_path = plugin_dir / vt_file
-        if not vt_path.exists():
-            logger.warning(f"Virtual tools file not found: {vt_path}")
-            continue
-
-        try:
-            safe_name = plugin_name.replace("-", "_")
-            spec = importlib.util.spec_from_file_location(
-                f"{safe_name}_virtual_tools",
-                vt_path,
-            )
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-
-            # Find VirtualToolProvider subclass in module
-            from core.interfaces.local_tools import LocalToolProvider
-
-            for attr_name in dir(module):
-                attr = getattr(module, attr_name)
-                if (
-                    isinstance(attr, type)
-                    and issubclass(attr, LocalToolProvider)
-                    and attr is not LocalToolProvider
-                ):
-                    instance = attr()
-                    providers.append(instance)
-                    logger.info(
-                        f"Registered virtual tool provider: {instance.get_server_name()} "
-                        f"({len(instance.get_tools())} tools) from {plugin_name}"
-                    )
-                    break
-        except Exception as e:
-            logger.error(f"Failed to load virtual tools from {plugin_name}: {e}")
-
-    mcp_server.set_local_tool_providers(providers)
+from core.mcp_gateway.tool_providers import discover_local_tool_providers
 
 
 def _preflight_check() -> None:
@@ -940,26 +872,37 @@ async def startup_cleanup():
     _preflight_check()
     app.state.start_time = time.time()
 
-    # Initialize PostgreSQL (required — _preflight_check guarantees DATABASE_URL)
+    # Check if DB is already initialized (embedded in core container)
+    from core.registry import get_database
+
+    existing_db = get_database()
+    embedded = existing_db is not None
+
+    # Initialize PostgreSQL (skip if already done by core container)
     database_url = os.environ.get("DATABASE_URL")
     try:
-        from core.database import DatabaseManager
-        from core.registry import set_database
+        if embedded:
+            db_manager = existing_db
+            logger.info("Admin: reusing existing PostgreSQL connection (embedded mode)")
+        else:
+            from core.database import DatabaseManager
+            from core.registry import set_database
 
-        db_manager = DatabaseManager(database_url)
-        await db_manager.initialize()
-        set_database(db_manager)
-        logger.info("Admin: PostgreSQL connection pool initialized")
+            db_manager = DatabaseManager(database_url)
+            await db_manager.initialize()
+            set_database(db_manager)
+            logger.info("Admin: PostgreSQL connection pool initialized")
 
-        # Attach DB log handler for WARNING+ persistence
-        from config.logging_config import attach_db_log_handler
+        if not embedded:
+            # Attach DB log handler for WARNING+ persistence
+            from config.logging_config import attach_db_log_handler
 
-        attach_db_log_handler()
+            attach_db_log_handler()
 
-        # Initialize ORM: inject DB, discover models, run auto-migrations
-        from core.orm import Registry as ORMRegistry
+            # Initialize ORM: inject DB, discover models, run auto-migrations
+            from core.orm import Registry as ORMRegistry
 
-        ORMRegistry.initialize(db_manager)
+            ORMRegistry.initialize(db_manager)
 
         # Initialize AuthDatabase (applies migration DDL)
         init_auth_db()
@@ -984,24 +927,25 @@ async def startup_cleanup():
         reset_secrets_manager()
         logger.info("Admin: SecretsManager re-initialized with PostgreSQL")
 
-        # One-time migrations: config files -> PostgreSQL
-        from core.config_migration import (
-            migrate_admin_config_to_db,
-            migrate_claude_settings_to_db,
-            migrate_mcp_perms_to_unified_id,
-            migrate_rest_api_config_to_db,
-            migrate_unify_users,
-            migrate_user_platforms,
-        )
+        if not embedded:
+            # One-time migrations (already done by core in embedded mode)
+            from core.config_migration import (
+                migrate_admin_config_to_db,
+                migrate_claude_settings_to_db,
+                migrate_mcp_perms_to_unified_id,
+                migrate_rest_api_config_to_db,
+                migrate_unify_users,
+                migrate_user_platforms,
+            )
 
-        await migrate_admin_config_to_db(BASE_DIR / "config" / "admin_config.json")
-        await migrate_rest_api_config_to_db(BASE_DIR / "config" / "rest_api.json")
-        await migrate_claude_settings_to_db(
-            BASE_DIR / "config" / "claude_settings.json"
-        )
-        await migrate_mcp_perms_to_unified_id()
-        await migrate_unify_users()
-        await migrate_user_platforms()
+            await migrate_admin_config_to_db(BASE_DIR / "config" / "admin_config.json")
+            await migrate_rest_api_config_to_db(BASE_DIR / "config" / "rest_api.json")
+            await migrate_claude_settings_to_db(
+                BASE_DIR / "config" / "claude_settings.json"
+            )
+            await migrate_mcp_perms_to_unified_id()
+            await migrate_unify_users()
+            await migrate_user_platforms()
 
         # Reload template loader now that DB is available (theme from SystemConfig)
         rebuild_template_loader()
@@ -1060,33 +1004,36 @@ async def startup_cleanup():
 
     asyncio.create_task(_notification_cleanup_loop())
 
-    # Initialize MCP Gateway client manager
-    from core.mcp_gateway import server as mcp_server
-    from core.mcp_gateway.client_manager import MCPClientManager
+    # Initialize MCP Gateway client manager (skipped in embedded mode or when disabled)
+    if not embedded and os.getenv("MCP_GATEWAY_ENABLED", "true").lower() != "false":
+        from core.mcp_gateway import server as mcp_server
+        from core.mcp_gateway.client_manager import MCPClientManager
 
-    client_manager = MCPClientManager()
-    mcp_server.set_client_manager(client_manager)
-    try:
-        await client_manager.start()
-    except Exception as e:
-        logger.warning(f"MCP Gateway: client manager start failed: {e}")
+        client_manager = MCPClientManager()
+        mcp_server.set_client_manager(client_manager)
+        try:
+            await client_manager.start()
+        except Exception as e:
+            logger.warning(f"MCP Gateway: client manager start failed: {e}")
 
-    # Discover virtual tool providers from plugins
-    _discover_local_tool_providers(mcp_server)
+        # Discover virtual tool providers from plugins
+        discover_local_tool_providers(mcp_server)
 
-    # Initialize async task manager for long-running MCP tool calls
-    from core.mcp_gateway.async_tasks import AsyncTaskManager
+        # Initialize async task manager for long-running MCP tool calls
+        from core.mcp_gateway.async_tasks import AsyncTaskManager
 
-    max_concurrent = int(os.getenv("ASYNC_TASKS_MAX_PER_AGENT", "5"))
-    task_manager = AsyncTaskManager(
-        notify_callback=mcp_server._send_task_notification,
-        max_concurrent_per_agent=max_concurrent,
-    )
-    mcp_server.set_task_manager(task_manager)
-    await task_manager.start()
+        max_concurrent = int(os.getenv("ASYNC_TASKS_MAX_PER_AGENT", "5"))
+        task_manager = AsyncTaskManager(
+            notify_callback=mcp_server._send_task_notification,
+            max_concurrent_per_agent=max_concurrent,
+        )
+        mcp_server.set_task_manager(task_manager)
+        await task_manager.start()
 
-    # Pre-connect to MCP servers in background (caches tool lists for dashboard)
-    asyncio.create_task(client_manager.warm_up())
+        # Pre-connect to MCP servers in background (caches tool lists for dashboard)
+        asyncio.create_task(client_manager.warm_up())
+    else:
+        logger.info("MCP Gateway disabled on UI container (MCP_GATEWAY_ENABLED=false)")
 
     # Register atexit handler to kill child processes (MCP servers) on exit.
     # This is a safety net for when shutdown_cleanup doesn't complete

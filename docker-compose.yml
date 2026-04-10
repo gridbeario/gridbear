@@ -25,69 +25,18 @@ services:
       - EXTRA_PLUGINS_DIRS=${EXTRA_PLUGINS_DIRS:-}
       - VERBOSE_AGENT_LOG=${VERBOSE_AGENT_LOG:-true}
       - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-}
-      - MCP_GATEWAY_URL=http://gridbear-ui:8080
+      - MCP_GATEWAY_URL=http://localhost:8000
       - DATABASE_URL=postgresql://gridbear:${POSTGRES_PASSWORD}@gridbear-postgres:5432/gridbear
-      - GRIDBEAR_GATEWAY_URL=http://gridbear-ui:8080
-    expose:
-      - "8000"
-    networks:
-      - gridbear-internal
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  ui:
-    build: .
-    container_name: gridbear-ui
-    init: true
-    restart: unless-stopped
-    command: uvicorn ui.app:app --host 0.0.0.0 --port 8080 --timeout-graceful-shutdown 15
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "8088:8080"
-    env_file:
-      - .env
-    environment:
+      # UI (served from same container on port 8080)
       - GRIDBEAR_BASE_URL=${GRIDBEAR_BASE_URL:-http://localhost:8088}
-      - GRIDBEAR_INTERNAL_URL=http://gridbear:8000
-      - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-}
+      - GRIDBEAR_INTERNAL_URL=http://localhost:8000
       - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-localhost}
       - WEBAUTHN_RP_NAME=GridBear
       - WEBAUTHN_ORIGIN=${WEBAUTHN_ORIGIN:-http://localhost:8088}
-      - DATABASE_URL=postgresql://gridbear:${POSTGRES_PASSWORD}@gridbear-postgres:5432/gridbear
-      # MCP Gateway tuning (defaults shown)
-      # - MCP_IDLE_TIMEOUT=300
-      # - MCP_CLEANUP_INTERVAL=60
-      # - MCP_CB_FAILURE_THRESHOLD=3
-      # - MCP_CB_FAILURE_WINDOW=120
-      # - MCP_CB_RECOVERY_TIMEOUT=30
-      # - MCP_REFRESH_INTERVAL=30
-      # - MCP_RATE_LIMIT_MAX_REQUESTS=100
-      # - MCP_RATE_LIMIT_WINDOW=60
-      # - MCP_MAX_SSE_CONNECTIONS=5
-      # - MCP_SSE_KEEPALIVE_INTERVAL=30
-      - EXTRA_PLUGINS_DIRS=${EXTRA_PLUGINS_DIRS:-}
-    volumes:
-      - ./data:/app/data
-      - ./credentials:/app/credentials
-      - ./config:/app/config
-      # Dev: mount code for hot reload
-      - ./ui:/app/ui
-      - ./core:/app/core
-      # Mount plugins for admin routes discovery
-      - ./plugins:/app/plugins
-      # Premium plugins (optional, mounted read-only)
-      - ${PREMIUM_PLUGINS_DIR:-./plugins-premium}:/app/plugins-premium:ro
+    expose:
+      - "8000"
+    ports:
+      - "8088:8080"
     networks:
       - gridbear-internal
     logging:

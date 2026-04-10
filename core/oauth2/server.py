@@ -13,7 +13,6 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from config.logging_config import logger
-from ui.auth.session import get_current_user
 
 from .models import OAuth2Database
 
@@ -22,10 +21,18 @@ router = APIRouter()
 ADMIN_DIR = Path(__file__).resolve().parent.parent.parent / "ui"
 templates = Jinja2Templates(directory=ADMIN_DIR / "templates")
 
-# Register CSRF token for consent template
-from ui.csrf import get_csrf_token as _get_csrf_token
+# CSRF token registered lazily on first use to avoid importing ui.csrf at module level
+_csrf_registered = False
 
-templates.env.globals["csrf_token"] = _get_csrf_token
+
+def _ensure_csrf_registered():
+    global _csrf_registered
+    if not _csrf_registered:
+        from ui.csrf import get_csrf_token as _get_csrf_token
+
+        templates.env.globals["csrf_token"] = _get_csrf_token
+        _csrf_registered = True
+
 
 # Database instance (initialized lazily)
 _db: OAuth2Database | None = None
@@ -95,6 +102,9 @@ async def authorize_get(
     code_challenge_method: str = Query(default="S256"),
 ):
     """OAuth2 Authorization Endpoint (GET - show consent page)."""
+    from ui.auth.session import get_current_user
+
+    _ensure_csrf_registered()
     # Validate response_type
     if response_type != "code":
         if redirect_uri:
@@ -190,6 +200,8 @@ async def authorize_post(
     consent: str = Form(default=None),
 ):
     """OAuth2 Authorization Endpoint (POST - process consent)."""
+    from ui.auth.session import get_current_user
+
     if not redirect_uri:
         return _error_response("invalid_request", "redirect_uri is required")
 
