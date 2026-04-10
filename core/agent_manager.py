@@ -546,6 +546,48 @@ class AgentManager:
 
         return result
 
+    async def reload_agent(self, agent_id: str) -> bool:
+        """Hot-reload a single agent from DB config.
+
+        Atomic swap: creates new Agent before stopping old one.
+        Returns True if reload succeeded.
+        """
+        # Build new agent from fresh DB config
+        new_agent = await self._load_agent(agent_id)
+        if not new_agent:
+            logger.error("reload_agent: failed to load %s from DB", agent_id)
+            return False
+
+        # Stop old agent if exists
+        old_agent = self._agents.get(agent_id)
+        if old_agent:
+            try:
+                await old_agent.stop()
+                logger.info("Stopped old agent: %s", agent_id)
+            except Exception as e:
+                logger.warning("Error stopping old agent %s: %s", agent_id, e)
+
+        # Swap in registry
+        self._agents[agent_id] = new_agent
+
+        # Start new agent
+        try:
+            await new_agent.start()
+            logger.info("Reloaded agent: %s", agent_id)
+        except Exception as e:
+            logger.error("Failed to start reloaded agent %s: %s", agent_id, e)
+            return False
+
+        # Invalidate MCP gateway cache
+        try:
+            from core.mcp_gateway.server import invalidate_agent_config_cache
+
+            invalidate_agent_config_cache(agent_id)
+        except Exception:
+            pass
+
+        return True
+
     def get_agent(self, name: str) -> Agent | None:
         """Get agent by name.
 
