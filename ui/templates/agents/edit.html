@@ -292,7 +292,7 @@
                     <label class="block text-sm font-medium text-void-700 dark:text-void-200">Email Account (Gmail MCP)</label>
                     <input type="text" name="email_account"
                            value="{{ agent.email.account if agent and agent.email else '' }}"
-                           placeholder="hello@dubhe.it"
+                           placeholder="hello@example.com"
                            class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white placeholder-void-400 dark:placeholder-void-500 focus:outline-none focus:border-nordic-500/50 transition-all">
                     <p class="text-xs text-void-500 dark:text-void-400">The Gmail account used to send (must be in MCP permissions)</p>
                 </div>
@@ -300,21 +300,21 @@
                     <label class="block text-sm font-medium text-void-700 dark:text-void-200">Sender Name</label>
                     <input type="text" name="email_sender_name"
                            value="{{ agent.email.sender_name if agent and agent.email else '' }}"
-                           placeholder="Supporto Dubhe"
+                           placeholder="Support Team"
                            class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white placeholder-void-400 dark:placeholder-void-500 focus:outline-none focus:border-nordic-500/50 transition-all">
                 </div>
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-void-700 dark:text-void-200">From Alias</label>
                     <input type="text" name="email_from_alias"
                            value="{{ agent.email.from_alias if agent and agent.email else '' }}"
-                           placeholder="peggy@dubhe.it"
+                           placeholder="agent@example.com"
                            class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white placeholder-void-400 dark:placeholder-void-500 focus:outline-none focus:border-nordic-500/50 transition-all">
                     <p class="text-xs text-void-500 dark:text-void-400">The "from" address shown to recipients (alias of the account)</p>
                 </div>
                 <div class="space-y-2 md:col-span-2">
                     <label class="block text-sm font-medium text-void-700 dark:text-void-200">Signature</label>
                     <textarea name="email_signature" rows="4"
-                              placeholder="--&#10;Peggy | Assistente Virtuale&#10;Dubhe Srls"
+                              placeholder="--&#10;Agent Name | Virtual Assistant&#10;Company Name"
                               class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white placeholder-void-400 dark:placeholder-void-500 focus:outline-none focus:border-nordic-500/50 transition-all resize-y">{{ agent.email.signature if agent and agent.email and agent.email.signature else '' }}</textarea>
                 </div>
             </div>
