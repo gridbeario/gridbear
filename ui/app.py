@@ -992,33 +992,36 @@ async def startup_cleanup():
 
     asyncio.create_task(_notification_cleanup_loop())
 
-    # Initialize MCP Gateway client manager
-    from core.mcp_gateway import server as mcp_server
-    from core.mcp_gateway.client_manager import MCPClientManager
+    # Initialize MCP Gateway client manager (skipped when core container serves MCP)
+    if os.getenv("MCP_GATEWAY_ENABLED", "true").lower() != "false":
+        from core.mcp_gateway import server as mcp_server
+        from core.mcp_gateway.client_manager import MCPClientManager
 
-    client_manager = MCPClientManager()
-    mcp_server.set_client_manager(client_manager)
-    try:
-        await client_manager.start()
-    except Exception as e:
-        logger.warning(f"MCP Gateway: client manager start failed: {e}")
+        client_manager = MCPClientManager()
+        mcp_server.set_client_manager(client_manager)
+        try:
+            await client_manager.start()
+        except Exception as e:
+            logger.warning(f"MCP Gateway: client manager start failed: {e}")
 
-    # Discover virtual tool providers from plugins
-    discover_local_tool_providers(mcp_server)
+        # Discover virtual tool providers from plugins
+        discover_local_tool_providers(mcp_server)
 
-    # Initialize async task manager for long-running MCP tool calls
-    from core.mcp_gateway.async_tasks import AsyncTaskManager
+        # Initialize async task manager for long-running MCP tool calls
+        from core.mcp_gateway.async_tasks import AsyncTaskManager
 
-    max_concurrent = int(os.getenv("ASYNC_TASKS_MAX_PER_AGENT", "5"))
-    task_manager = AsyncTaskManager(
-        notify_callback=mcp_server._send_task_notification,
-        max_concurrent_per_agent=max_concurrent,
-    )
-    mcp_server.set_task_manager(task_manager)
-    await task_manager.start()
+        max_concurrent = int(os.getenv("ASYNC_TASKS_MAX_PER_AGENT", "5"))
+        task_manager = AsyncTaskManager(
+            notify_callback=mcp_server._send_task_notification,
+            max_concurrent_per_agent=max_concurrent,
+        )
+        mcp_server.set_task_manager(task_manager)
+        await task_manager.start()
 
-    # Pre-connect to MCP servers in background (caches tool lists for dashboard)
-    asyncio.create_task(client_manager.warm_up())
+        # Pre-connect to MCP servers in background (caches tool lists for dashboard)
+        asyncio.create_task(client_manager.warm_up())
+    else:
+        logger.info("MCP Gateway disabled on UI container (MCP_GATEWAY_ENABLED=false)")
 
     # Register atexit handler to kill child processes (MCP servers) on exit.
     # This is a safety net for when shutdown_cleanup doesn't complete

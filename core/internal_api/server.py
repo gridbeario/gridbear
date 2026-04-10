@@ -617,15 +617,22 @@ def _discover_plugin_api_routes(app: FastAPI, plugin_manager) -> None:
             )
 
 
-def create_app(plugin_manager=None) -> FastAPI:
+def create_app(plugin_manager=None, mount_mcp=False) -> FastAPI:
     """Create the internal API FastAPI application.
 
     Args:
         plugin_manager: If provided, discovers and mounts plugin API routes
             from plugins/{name}/api/routes.py.
+        mount_mcp: If True, mounts MCP Gateway routes on this app.
     """
     app = FastAPI(title="GridBear Internal API", docs_url=None, redoc_url=None)
     app.include_router(router)
+
+    if mount_mcp:
+        from core.mcp_gateway.server import router as mcp_gateway_router
+
+        app.include_router(mcp_gateway_router, tags=["mcp"])
+        logger.info("MCP Gateway routes mounted on internal API")
 
     if plugin_manager:
         _discover_plugin_api_routes(app, plugin_manager)

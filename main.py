@@ -1235,6 +1235,39 @@ async def main():
     # Fire lifecycle hooks — let plugins self-wire after agents are loaded
     await plugin_manager.hooks.execute(HookName.ON_STARTUP, {})
 
+    # Initialize MCP Gateway on core container
+    mcp_gateway_enabled = os.getenv("MCP_GATEWAY_ENABLED", "true").lower() != "false"
+    mcp_client_manager = None
+    if mcp_gateway_enabled:
+        try:
+            from core.mcp_gateway import server as mcp_server
+            from core.mcp_gateway.client_manager import MCPClientManager
+            from core.mcp_gateway.tool_providers import discover_local_tool_providers
+
+            mcp_client_manager = MCPClientManager()
+            mcp_server.set_client_manager(mcp_client_manager)
+            await mcp_client_manager.start()
+
+            discover_local_tool_providers(mcp_server)
+
+            from core.mcp_gateway.async_tasks import AsyncTaskManager
+
+            max_concurrent = int(os.getenv("ASYNC_TASKS_MAX_PER_AGENT", "5"))
+            task_mgr = AsyncTaskManager(
+                notify_callback=mcp_server._send_task_notification,
+                max_concurrent_per_agent=max_concurrent,
+            )
+            mcp_server.set_task_manager(task_mgr)
+            await task_mgr.start()
+
+            asyncio.create_task(mcp_client_manager.warm_up())
+            logger.info("MCP Gateway initialized on core container")
+        except Exception as e:
+            logger.warning(
+                "MCP Gateway init failed (bot continues without tools): %s", e
+            )
+            mcp_client_manager = None
+
     def signal_handler():
         logger.info("Shutdown signal received")
         stop_event.set()
@@ -1258,7 +1291,10 @@ async def main():
 
         from core.internal_api.server import create_app as create_internal_app
 
-        internal_app = create_internal_app(plugin_manager=plugin_manager)
+        internal_app = create_internal_app(
+            plugin_manager=plugin_manager,
+            mount_mcp=(mcp_client_manager is not None),
+        )
         internal_app.state.bot_start_time = time.time()
         api_config = uvicorn.Config(
             internal_app, host="0.0.0.0", port=8000, log_level="warning"
@@ -1285,6 +1321,18 @@ async def main():
         restart_monitor.cancel()
         await agent_manager.stop_all()
         await plugin_manager.shutdown_all()
+
+        # Shutdown MCP Gateway (if running on core)
+        if mcp_client_manager:
+            try:
+                from core.mcp_gateway.server import get_task_manager
+
+                task_mgr = get_task_manager()
+                if task_mgr:
+                    await task_mgr.shutdown()
+                await mcp_client_manager.shutdown()
+            except Exception as e:
+                logger.warning("MCP Gateway shutdown error: %s", e)
 
         # Shutdown PostgreSQL pool
         if db:
