@@ -75,9 +75,9 @@ RUN ARCH=$(dpkg --print-architecture) \
     | tar xz -C /usr/local/bin github-mcp-server \
     && chmod +x /usr/local/bin/github-mcp-server
 
-# Install Google Sheets MCP server
+# Install Google Sheets MCP server + boto3 for S3 backup uploads
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system mcp-google-sheets
+    uv pip install --system mcp-google-sheets boto3
 
 COPY . .
 
