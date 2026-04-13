@@ -62,7 +62,7 @@ remote-dev = [
     "asyncssh>=2.14.0",
 ]
 pdf = [
-    "pymupdf>=1.23.0",
+    "pymupdf>=1.27.2.2",
 ]
 executor = [
     "docker>=7.0.0",
