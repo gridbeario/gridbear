@@ -742,40 +742,24 @@ When sending emails as {self._agent_display_name or "yourself"}, ALWAYS append t
                 f"if they are in the right conversation."
             )
 
-        # Include conversation documents (per-conversation knowledge base)
+        # Include conversation documents (metadata only — content via tool)
         if self._conversation_documents:
-            doc_parts = []
-            total_chars = 0
-            max_chars = 100_000  # 100KB total cap for all documents
+            doc_lines = []
             for doc in self._conversation_documents:
-                text = doc.get("content_text", "")
                 fname = doc.get("original_filename", "document")
-                if not text:
-                    doc_parts.append(
-                        f"--- document: {fname} ---\n"
-                        f"(no text content extracted)\n"
-                        f"--- end document ---"
-                    )
-                    continue
-                remaining = max_chars - total_chars
-                if remaining <= 0:
-                    doc_parts.append(
-                        f"--- document: {fname} ---\n"
-                        f"(skipped — context size limit reached)\n"
-                        f"--- end document ---"
-                    )
-                    continue
-                if len(text) > remaining:
-                    text = text[:remaining] + "\n... (truncated)"
-                total_chars += len(text)
-                doc_parts.append(
-                    f"--- document: {fname} ---\n{text}\n--- end document ---"
-                )
+                text = doc.get("content_text", "")
+                size_kb = len(text) / 1024 if text else 0
+                status = f"{size_kb:.0f}KB" if text else "no text"
+                doc_lines.append(f"- {fname} ({status})")
+            conv_id = ""
+            if self._channel_metadata:
+                conv_id = self._channel_metadata.get("conversation_id", "")
             parts.append(
                 "[Conversation Documents]\n"
-                "The user has uploaded the following documents to this "
-                "conversation. Reference them when answering questions.\n\n"
-                + "\n\n".join(doc_parts)
+                "The user has uploaded documents to this conversation. "
+                "To read their content, use the conversation_docs__read tool "
+                f'with conversation_id="{conv_id}" and the filename.\n\n'
+                + "\n".join(doc_lines)
             )
 
         # Include recent chat history for conversational context

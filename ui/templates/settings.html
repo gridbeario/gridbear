@@ -195,6 +195,33 @@
             </div>
         </div>
 
+        <!-- Debug / Diagnostics -->
+        <div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
+            <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-frost-500/5 to-transparent">
+                <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
+                    <i class="fas fa-bug text-frost-500"></i>
+                    Diagnostics
+                </h3>
+            </div>
+            <div class="p-5">
+                <form method="POST" action="/settings/debug">
+                    {% include "partials/csrf_field.html" %}
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input type="checkbox" name="dump_prompts" {{ 'checked' if dump_prompts else '' }}
+                               class="rounded text-nordic-500 focus:ring-nordic-500/40">
+                        <div>
+                            <span class="text-sm font-medium text-void-900 dark:text-white">Dump prompts to file</span>
+                            <p class="text-xs text-void-500 dark:text-void-400">Save full prompts to <code class="text-xs">/data/prompt_dumps/</code> for inspection</p>
+                        </div>
+                    </label>
+                    <button type="submit" class="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-nordic-500 hover:bg-nordic-600 text-white font-medium transition-all shadow-lg shadow-nordic-500/20">
+                        <i class="fas fa-save"></i>
+                        Save
+                    </button>
+                </form>
+            </div>
+        </div>
+
         <!-- Quick Commands -->
         <div class="rounded-2xl bg-void-900 dark:bg-void-800/50 border border-void-800 overflow-hidden text-white">
             <div class="p-5 border-b border-void-800">

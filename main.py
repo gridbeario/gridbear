@@ -623,6 +623,28 @@ class AgentAwareMessageProcessor(MessageProcessor):
 
         full_prompt = builder.build()
 
+        # Plan execution: inject active task into prompt
+        _active_task = None
+        _conv_id = (
+            message.channel_metadata.get("conversation_id")
+            if message.channel_metadata
+            else None
+        )
+        if _conv_id:
+            try:
+                from plugins.planning.plan_executor import (
+                    build_task_prompt_injection,
+                    get_active_plan_task,
+                    mark_task_in_progress,
+                )
+
+                _active_task = get_active_plan_task(_conv_id)
+                if _active_task:
+                    full_prompt += build_task_prompt_injection(_active_task)
+                    await mark_task_in_progress(_active_task["task_id"], _conv_id)
+            except Exception as exc:
+                logger.debug("Plan executor pre-run failed: %s", exc)
+
         hook_data.prompt = full_prompt
         # Workflow steps get a fresh runner session (no --resume) to avoid
         # contamination from previous conversations.
@@ -717,6 +739,23 @@ class AgentAwareMessageProcessor(MessageProcessor):
 
         hook_data.response_text = response.text
         hook_data.session_id = response.session_id
+
+        # Plan execution: mark task completed after runner response
+        if _active_task and _conv_id and not response.is_error:
+            try:
+                from plugins.planning.plan_executor import (
+                    mark_task_completed,
+                    truncate_result,
+                )
+
+                await mark_task_completed(
+                    task_id=_active_task["task_id"],
+                    conversation_id=_conv_id,
+                    result=truncate_result(response.text),
+                    plan_id=_active_task["plan_id"],
+                )
+            except Exception as exc:
+                logger.debug("Plan executor post-run failed: %s", exc)
 
         # HOOK: after_runner_call
         hook_data = await self.hooks.execute(

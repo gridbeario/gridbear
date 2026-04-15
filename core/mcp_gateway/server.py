@@ -369,6 +369,7 @@ _BUILTIN_PREFIXES = (
     "ask_agent",
     "async_",
     "chat_history__",
+    "conversation_docs__",
     "credential_vault__",
     "search_tools",
     "execute_discovered_tool",
@@ -873,6 +874,90 @@ _CHAT_HISTORY_TOOLS = [
         },
     },
 ]
+
+
+# --- Conversation Documents tools ---
+
+_CONVERSATION_DOCS_TOOLS = [
+    {
+        "name": "conversation_docs__read",
+        "description": (
+            "Read the full text content of a document uploaded to the current "
+            "conversation. The list of available documents is shown in the system "
+            "prompt under [Conversation Documents]."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "string",
+                    "description": "Conversation ID from channel_metadata",
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "Original filename of the document to read",
+                },
+            },
+            "required": ["conversation_id", "filename"],
+        },
+    },
+]
+
+
+async def _handle_conversation_docs_call(
+    tool_name: str,
+    arguments: dict,
+) -> list[dict]:
+    """Handle conversation_docs__* virtual tool calls."""
+    from core.registry import get_database
+
+    db = get_database()
+    if db is None:
+        return [{"type": "text", "text": "Database not available."}]
+
+    short = tool_name.split("__", 1)[-1]
+
+    if short == "read":
+        conv_id = arguments.get("conversation_id", "").strip()
+        filename = arguments.get("filename", "").strip()
+        if not conv_id or not filename:
+            return [
+                {
+                    "type": "text",
+                    "text": "Error: conversation_id and filename are required.",
+                }
+            ]
+
+        try:
+            async with db.acquire() as conn:
+                row = await (
+                    await conn.execute(
+                        "SELECT original_filename, content_text "
+                        "FROM chat.webchat_documents "
+                        "WHERE conversation_id = %s "
+                        "AND original_filename = %s",
+                        (conv_id, filename),
+                    )
+                ).fetchone()
+                if not row:
+                    return [
+                        {
+                            "type": "text",
+                            "text": f"Document '{filename}' not found in this conversation.",
+                        }
+                    ]
+                text = row["content_text"] or "(no text content extracted)"
+                return [
+                    {
+                        "type": "text",
+                        "text": f"--- {row['original_filename']} ---\n{text}\n--- end ---",
+                    }
+                ]
+        except Exception as e:
+            logger.error("conversation_docs tool error: %s", e)
+            return [{"type": "text", "text": f"Error: {e}"}]
+
+    return [{"type": "text", "text": f"Unknown tool: {tool_name}"}]
 
 
 async def _handle_send_file(
@@ -1537,6 +1622,9 @@ async def _dispatch_tool_call(
     if tool_name.startswith("chat_history__"):
         return await _handle_chat_history_call(tool_name, arguments)
 
+    if tool_name.startswith("conversation_docs__"):
+        return await _handle_conversation_docs_call(tool_name, arguments)
+
     if tool_name.startswith("credential_vault__"):
         return await _handle_vault_call(tool_name, arguments)
 
@@ -2072,6 +2160,9 @@ async def _handle_message(msg: dict, session_id: str, request: Request) -> dict 
 
             # Add chat history tools (always available)
             tools.extend(_CHAT_HISTORY_TOOLS)
+
+            # Add conversation document tools (always available)
+            tools.extend(_CONVERSATION_DOCS_TOOLS)
 
             # Add search_tools + execute_discovered_tool (always available)
             tools.append(_SEARCH_TOOLS_TOOL)

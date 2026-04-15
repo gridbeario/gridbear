@@ -393,6 +393,31 @@ class ClaudeRunner(BaseRunner):
             )
             logger.debug(f"Running command: {' '.join(cmd)}")
 
+            # Always log prompt size for diagnostics
+            prompt_bytes = len(prompt.encode("utf-8"))
+            logger.info(
+                f"Prompt size: {prompt_bytes} bytes "
+                f"({prompt_bytes / 1024:.1f} KB, "
+                f"{prompt.count(chr(10))} lines)"
+            )
+
+            # Dump prompt to file for inspection (toggle via system_config)
+            try:
+                from core.system_config import SystemConfig
+
+                if SystemConfig.get_param_sync("dump_prompts"):
+                    dump_dir = Path("/app/data/prompt_dumps")
+                    dump_dir.mkdir(exist_ok=True)
+                    from datetime import datetime
+
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    agent_label = agent_id or "unknown"
+                    dump_path = dump_dir / f"{agent_label}_{ts}.txt"
+                    dump_path.write_text(prompt, encoding="utf-8")
+                    logger.info(f"Prompt dumped to {dump_path}")
+            except Exception:
+                pass
+
             # Verbose logging: log full prompt
             if self.verbose:
                 logger.info("=" * 60)
@@ -415,7 +440,7 @@ class ClaudeRunner(BaseRunner):
                     )
 
                 try:
-                    result = await self._run_subprocess(cmd)
+                    result = await self._run_subprocess(cmd, stdin_data=prompt)
 
                     # Cancel feedback task if still pending
                     if feedback_task and not feedback_task.done():
@@ -547,11 +572,15 @@ class ClaudeRunner(BaseRunner):
         model: str | None = None,
         no_tools: bool = False,
     ) -> list[str]:
-        """Build Claude CLI command."""
+        """Build Claude CLI command.
+
+        The prompt is passed via stdin (not as a CLI argument) to avoid
+        OS ARG_MAX limits (~2MB) when the prompt grows large.
+        """
         cmd = [
             "claude",
             "-p",
-            prompt,
+            "-",  # Read prompt from stdin
             "--output-format",
             "json",
             "--model",
@@ -589,11 +618,21 @@ class ClaudeRunner(BaseRunner):
         return cmd
 
     async def _run_subprocess(
-        self, cmd: list[str], retry_without_resume: bool = True
+        self,
+        cmd: list[str],
+        retry_without_resume: bool = True,
+        stdin_data: str | None = None,
     ) -> str:
-        """Run subprocess and return stdout."""
+        """Run subprocess and return stdout.
+
+        Args:
+            cmd: Command to execute.
+            retry_without_resume: Retry without --resume on session expiry.
+            stdin_data: Data to pass via stdin (used for prompt).
+        """
         process = await asyncio.create_subprocess_exec(
             *cmd,
+            stdin=asyncio.subprocess.PIPE if stdin_data else None,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=self.working_dir,
@@ -601,8 +640,9 @@ class ClaudeRunner(BaseRunner):
         )
 
         try:
+            stdin_bytes = stdin_data.encode("utf-8") if stdin_data else None
             stdout, stderr = await asyncio.wait_for(
-                process.communicate(), timeout=self.timeout
+                process.communicate(input=stdin_bytes), timeout=self.timeout
             )
         except asyncio.TimeoutError:
             process.kill()
@@ -633,7 +673,11 @@ class ClaudeRunner(BaseRunner):
                         skip_next = True
                         continue
                     new_cmd.append(c)
-                return await self._run_subprocess(new_cmd, retry_without_resume=False)
+                return await self._run_subprocess(
+                    new_cmd,
+                    retry_without_resume=False,
+                    stdin_data=stdin_data,
+                )
 
         if not stdout_str and stderr_str:
             logger.warning(f"No stdout, stderr: {stderr_str[:1000]}")

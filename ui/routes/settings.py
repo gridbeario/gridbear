@@ -40,6 +40,7 @@ def get_template_context(request: Request, **kwargs) -> dict:
 @router.get("", response_class=HTMLResponse)
 async def settings_page(request: Request, _=Depends(require_login)):
     """General settings page."""
+    from core.system_config import SystemConfig
     from ui import tts_service
 
     encryption_available = secrets_manager.is_available()
@@ -53,6 +54,8 @@ async def settings_page(request: Request, _=Depends(require_login)):
     tts_providers = tts_service.get_available_providers()
     current_tts_provider = config.get_webchat_tts_provider()
 
+    dump_prompts = bool(SystemConfig.get_param_sync("dump_prompts"))
+
     return templates.TemplateResponse(
         "settings.html",
         get_template_context(
@@ -64,6 +67,7 @@ async def settings_page(request: Request, _=Depends(require_login)):
             bot_email_settings=bot_email_settings,
             tts_providers=tts_providers,
             current_tts_provider=current_tts_provider,
+            dump_prompts=dump_prompts,
         ),
     )
 
@@ -115,6 +119,19 @@ async def save_bot_settings(
     )
 
     return RedirectResponse("/settings?saved=bot", status_code=303)
+
+
+@router.post("/debug")
+async def save_debug_settings(
+    request: Request,
+    dump_prompts: str = Form(""),
+    _=Depends(require_login),
+):
+    """Save debug/diagnostics settings."""
+    from core.system_config import SystemConfig
+
+    SystemConfig.set_param_sync("dump_prompts", dump_prompts == "on")
+    return RedirectResponse("/settings?saved=debug", status_code=303)
 
 
 @router.post("/tts")
