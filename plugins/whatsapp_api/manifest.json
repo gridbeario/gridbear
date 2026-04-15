@@ -19,6 +19,8 @@
       "required": true
     }
   },
+  "public_api": true,
+  "public_api_prefix": "/api/whatsapp-meta",
   "conflicts": ["whatsapp_evolution"],
   "dependencies": {
     "required": ["sessions", "attachments"],

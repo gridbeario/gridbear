@@ -266,6 +266,44 @@ class PluginAdminRegistry:
                         "Failed to register routes for %s: %s", plugin_name, exc
                     )
 
+            # Also mount api/routes.py if plugin declares public_api in manifest
+            api_routes_path = plugin_path / "api" / "routes.py"
+            if api_routes_path.exists():
+                manifest_path = plugin_path / "manifest.json"
+                if manifest_path.exists():
+                    import json
+
+                    try:
+                        manifest = json.loads(manifest_path.read_text())
+                    except Exception:
+                        manifest = {}
+                    if not manifest.get("public_api"):
+                        continue
+                try:
+                    module = self._import_plugin_module(
+                        plugin_name, plugin_path, api_routes_path
+                    )
+                    if hasattr(module, "router"):
+                        prefix = manifest.get(
+                            "public_api_prefix", f"/api/{plugin_name}"
+                        )
+                        app.include_router(
+                            module.router,
+                            prefix=prefix,
+                            tags=[f"api-{plugin_name}"],
+                        )
+                        logger.info(
+                            "Registered public API routes for plugin: %s at %s",
+                            plugin_name,
+                            prefix,
+                        )
+                except Exception as exc:
+                    logger.error(
+                        "Failed to register API routes for %s: %s",
+                        plugin_name,
+                        exc,
+                    )
+
     @staticmethod
     def _get_enabled_plugins_raw() -> list[str]:
         """Query enabled plugins via psycopg (no ORM needed)."""
