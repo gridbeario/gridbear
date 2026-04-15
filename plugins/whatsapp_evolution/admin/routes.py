@@ -85,7 +85,7 @@ async def _get_instances_status() -> list[dict]:
     # User-created instances from DB
     try:
         from core.registry import get_agent_manager
-        from plugins.whatsapp.models import UserInstance
+        from plugins.whatsapp_evolution.models import UserInstance
 
         agent_manager = get_agent_manager()
         if agent_manager:
@@ -156,7 +156,7 @@ async def connect_instance(
         return JSONResponse(result)
 
     # If instance doesn't exist, create it
-    webhook_url = "http://gridbear:8000/api/whatsapp/webhook"
+    webhook_url = "http://gridbear:8000/api/whatsapp_evolution/webhook"
     create_result = await _evolution_request(
         "POST",
         "/instance/create",

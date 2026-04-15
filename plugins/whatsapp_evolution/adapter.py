@@ -30,7 +30,7 @@ from .evolution_client import (
 from .formatting import markdown_to_whatsapp, split_message
 
 # Create translator for this plugin
-_ = make_translator("whatsapp")
+_ = make_translator("whatsapp_evolution")
 
 WHATSAPP_MAX_MESSAGE_LENGTH = 4096
 COMMAND_PREFIX = "!"

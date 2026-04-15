@@ -1,6 +1,6 @@
 """WhatsApp legacy database layer (DEPRECATED).
 
-This module is superseded by plugins/whatsapp/models.py (ORM models).
+This module is superseded by plugins/whatsapp_evolution/models.py (ORM models).
 Kept only for legacy migration code that runs on existing installs.
 The WhatsAppDB class is no longer imported by any consumer.
 """

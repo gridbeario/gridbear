@@ -139,7 +139,7 @@ async def whatsapp_connect_page(
             "request": request,
             "user": user,
             "service": {"id": "whatsapp", "name": "WhatsApp"},
-            "plugin_name": "whatsapp",
+            "plugin_name": "whatsapp_evolution",
             "user_instances": user_instances,
             "connectable_agents": connectable_agents,
         },
@@ -159,7 +159,7 @@ async def whatsapp_connect_instance(
     if result and "error" not in result:
         return JSONResponse(result)
 
-    webhook_url = "http://gridbear:8000/api/whatsapp/webhook"
+    webhook_url = "http://gridbear:8000/api/whatsapp_evolution/webhook"
     create_result = await _evolution_api_request(
         "POST",
         "/instance/create",
@@ -259,7 +259,7 @@ async def whatsapp_create_instance(
     from ui.secrets_manager import secrets_manager
 
     evo_api_key = secrets_manager.get_plain("EVOLUTION_API_KEY")
-    webhook_url = "http://gridbear:8000/api/whatsapp/webhook"
+    webhook_url = "http://gridbear:8000/api/whatsapp_evolution/webhook"
     create_result = await _evolution_api_request(
         "POST",
         "/instance/create",

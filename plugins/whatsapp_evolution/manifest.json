@@ -1,8 +1,9 @@
 {
-  "name": "whatsapp",
+  "name": "whatsapp_evolution",
   "version": "0.0.1",
   "type": "channel",
   "description": "WhatsApp messaging channel via Evolution API",
+  "conflicts": ["whatsapp_api"],
   "entry_point": "adapter.py",
   "class_name": "WhatsAppChannel",
   "config_schema": {

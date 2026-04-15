@@ -2,7 +2,7 @@
   "items": [
     {
       "label": "WhatsApp",
-      "url": "/plugin/whatsapp",
+      "url": "/plugin/whatsapp_evolution",
       "icon": "fab fa-whatsapp",
       "section": "channels",
       "priority": 15

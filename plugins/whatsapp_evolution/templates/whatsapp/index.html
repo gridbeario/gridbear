@@ -48,7 +48,7 @@
                     <span x-text="connecting && currentInstance === '{{ instance.instance_name }}' ? 'Connecting...' : 'Connect'"></span>
                 </button>
                 {% else %}
-                <form method="POST" action="/plugins/whatsapp/disconnect"
+                <form method="POST" action="/plugins/whatsapp_evolution/disconnect"
                       onsubmit="return confirm('Disconnect WhatsApp session?');">
                     {% include "partials/csrf_field.html" %}
                     <input type="hidden" name="instance_name" value="{{ instance.instance_name }}">
@@ -225,7 +225,7 @@ function whatsappManager() {
                 formData.append('instance_name', instanceName);
                 formData.append('csrf_token', document.querySelector('[name=csrf_token]')?.value || '');
 
-                const resp = await fetch('/plugins/whatsapp/connect', {
+                const resp = await fetch('/plugins/whatsapp_evolution/connect', {
                     method: 'POST',
                     body: formData,
                 });
@@ -250,7 +250,7 @@ function whatsappManager() {
 
             this.pollInterval = setInterval(async () => {
                 try {
-                    const resp = await fetch(`/plugins/whatsapp/status/${instanceName}`);
+                    const resp = await fetch(`/plugins/whatsapp_evolution/status/${instanceName}`);
                     const data = await resp.json();
                     if (data.connected) {
                         this.stopPolling();
@@ -285,7 +285,7 @@ function whatsappManager() {
                 formData.append('phone', phone);
                 formData.append('csrf_token', document.querySelector('[name=csrf_token]')?.value || '');
 
-                const resp = await fetch('/plugins/whatsapp/test', {
+                const resp = await fetch('/plugins/whatsapp_evolution/test', {
                     method: 'POST',
                     body: formData,
                 });
