@@ -1982,7 +1982,8 @@ function chatApp() {
 
         executePlan() {
             if (!this.activeConversationId) return;
-            this.inputText = 'Proceed with the plan.';
+            var mention = this.selectedAgent ? '@' + this.selectedAgent + ' ' : '';
+            this.inputText = mention + 'Proceed with the plan.';
             this.sendMessage();
         },
 
