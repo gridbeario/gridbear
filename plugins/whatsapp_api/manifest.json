@@ -10,12 +10,20 @@
   "config_schema": {
     "app_secret": {
       "type": "secret",
+      "env": "WHATSAPP_API_APP_SECRET",
       "description": "Meta app secret for webhook HMAC validation",
       "required": true
     },
     "verify_token": {
       "type": "secret",
+      "env": "WHATSAPP_API_VERIFY_TOKEN",
       "description": "Token for webhook verification handshake",
+      "required": true
+    },
+    "access_token": {
+      "type": "secret",
+      "env": "WHATSAPP_API_ACCESS_TOKEN",
+      "description": "Meta API access token (System User or temporary)",
       "required": true
     }
   },

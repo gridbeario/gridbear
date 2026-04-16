@@ -55,7 +55,7 @@ class WhatsAppMetaChannel(BaseChannel):
     def __init__(self, config: dict, agent_name: str | None = None):
         super().__init__(config, agent_name)
         self.phone_number_id = config.get("phone_number_id", "")
-        token_key = config.get("access_token_secret", "WHATSAPP_ACCESS_TOKEN")
+        token_key = config.get("access_token_secret", "WHATSAPP_API_ACCESS_TOKEN")
         self._access_token = secrets_manager.get_plain(token_key) or ""
 
         self._client: MetaClient | None = None
