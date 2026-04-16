@@ -67,7 +67,7 @@ async def webhook_receive(request: Request):
 
 async def _dispatch_events(payload: dict) -> None:
     """Route incoming Meta webhook events to the appropriate channel."""
-    from plugins.whatsapp_api.adapter import WhatsAppMetaChannel
+    from plugins.whatsapp_api import registry
 
     for entry in payload.get("entry", []):
         for change in entry.get("changes", []):
@@ -76,11 +76,13 @@ async def _dispatch_events(payload: dict) -> None:
             if not phone_number_id:
                 continue
 
-            channel = WhatsAppMetaChannel.get_channel(phone_number_id)
+            channel = registry.get_channel(phone_number_id)
             if not channel:
                 logger.warning(
-                    "WhatsApp Meta webhook: no channel for phone_number_id=%s",
+                    "WhatsApp Meta webhook: no channel for phone_number_id=%s "
+                    "(registry keys: %s)",
                     phone_number_id,
+                    registry.get_all_keys(),
                 )
                 continue
 

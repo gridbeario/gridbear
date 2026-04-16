@@ -34,23 +34,27 @@ class WhatsAppMetaChannel(BaseChannel):
 
     platform = "whatsapp"
 
-    # Class-level registry for webhook routing
-    _channels: dict[str, WhatsAppMetaChannel] = {}
+    # Registry delegated to module-level dict to avoid class-identity
+    # issues when the module is imported from different paths
+    # (main.py vs ui.app load different class objects).
 
-    @classmethod
-    def register(cls, phone_number_id: str, instance: WhatsAppMetaChannel) -> None:
-        """Register a channel instance for webhook routing."""
-        cls._channels[phone_number_id] = instance
+    @staticmethod
+    def register(phone_number_id: str, instance: WhatsAppMetaChannel) -> None:
+        from . import registry
 
-    @classmethod
-    def unregister(cls, phone_number_id: str) -> None:
-        """Unregister a channel instance."""
-        cls._channels.pop(phone_number_id, None)
+        registry.register(phone_number_id, instance)
 
-    @classmethod
-    def get_channel(cls, phone_number_id: str) -> WhatsAppMetaChannel | None:
-        """Look up a channel instance by phone_number_id."""
-        return cls._channels.get(phone_number_id)
+    @staticmethod
+    def unregister(phone_number_id: str) -> None:
+        from . import registry
+
+        registry.unregister(phone_number_id)
+
+    @staticmethod
+    def get_channel(phone_number_id: str) -> WhatsAppMetaChannel | None:
+        from . import registry
+
+        return registry.get_channel(phone_number_id)
 
     def __init__(self, config: dict, agent_name: str | None = None):
         super().__init__(config, agent_name)
