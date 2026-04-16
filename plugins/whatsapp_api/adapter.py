@@ -314,8 +314,15 @@ class WhatsAppMetaChannel(BaseChannel):
         mime_type, _ = mimetypes.guess_type(file_path)
         mime_type = mime_type or "application/octet-stream"
 
+        logger.info(
+            "WhatsApp Meta: uploading file %s (%s) for %s",
+            path.name,
+            mime_type,
+            phone,
+        )
         try:
             media_id = await self._client.upload_media(file_path, mime_type)
+            logger.info("WhatsApp Meta: uploaded media_id=%s", media_id)
         except Exception as exc:
             logger.error(
                 "WhatsApp Meta: failed to upload media %s: %s",
@@ -331,6 +338,7 @@ class WhatsAppMetaChannel(BaseChannel):
                 await self._client.send_audio(phone, media_id)
             else:
                 await self._client.send_document(phone, media_id, caption, path.name)
+            logger.info("WhatsApp Meta: file sent to %s (%s)", phone, path.name)
             return True
         except Exception as exc:
             logger.error(

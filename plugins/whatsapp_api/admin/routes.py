@@ -33,14 +33,79 @@ async def whatsapp_api_dashboard(request: Request, _=Depends(require_login)):
     base_url = os.getenv("GRIDBEAR_BASE_URL", "").rstrip("/")
     webhook_url = f"{base_url}/api/whatsapp_api/webhook"
 
+    # Load agent channel configs for phone_number_id display
+    agent_channels = _get_agent_whatsapp_configs()
+
     return templates.TemplateResponse(
         "whatsapp_api.html",
         get_plugin_template_context(
             request,
             PLUGIN_DIR,
             webhook_url=webhook_url,
+            agent_channels=agent_channels,
         ),
     )
+
+
+def _get_agent_whatsapp_configs() -> list[dict]:
+    """Get all agents that have whatsapp_api configured."""
+    try:
+        from core.models.agent_config import AgentConfigRecord
+
+        records = AgentConfigRecord.search_sync(
+            [("is_active", "=", True)], order="name"
+        )
+        result = []
+        for r in records:
+            channels = r.get("channels") or {}
+            wa_config = channels.get("whatsapp_api")
+            if wa_config:
+                result.append(
+                    {
+                        "agent_id": r["id"],
+                        "agent_name": r["name"],
+                        "phone_number_id": wa_config.get("phone_number_id", ""),
+                    }
+                )
+        return result
+    except Exception:
+        return []
+
+
+@router.post("/agent-channel", response_class=JSONResponse)
+async def save_agent_channel(request: Request, _=Depends(require_login)):
+    """Save phone_number_id for an agent's whatsapp_api channel."""
+    from core.models.agent_config import AgentConfigRecord
+
+    body = await request.json()
+    agent_id = body.get("agent_id", "").strip()
+    phone_number_id = body.get("phone_number_id", "").strip()
+
+    if not agent_id:
+        return JSONResponse(
+            {"ok": False, "error": "agent_id is required"}, status_code=400
+        )
+
+    try:
+        record = AgentConfigRecord.get_sync(id=agent_id)
+        if not record:
+            return JSONResponse(
+                {"ok": False, "error": "Agent not found"}, status_code=404
+            )
+
+        channels = dict(record.get("channels") or {})
+        wa_config = dict(channels.get("whatsapp_api") or {})
+        wa_config["phone_number_id"] = phone_number_id
+        channels["whatsapp_api"] = wa_config
+
+        AgentConfigRecord.create_or_update_sync(
+            _conflict_fields=("id",),
+            id=agent_id,
+            channels=channels,
+        )
+        return JSONResponse({"ok": True})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
 
 
 @router.get("/authorized", response_class=JSONResponse)
