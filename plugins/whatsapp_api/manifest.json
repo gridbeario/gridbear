@@ -1,0 +1,37 @@
+{
+  "name": "whatsapp_api",
+  "version": "0.1.0",
+  "description": "WhatsApp channel via Meta Cloud API (graph.facebook.com)",
+  "type": "channel",
+  "entry_point": "adapter.py",
+  "class_name": "WhatsAppMetaChannel",
+  "instantiation": "per-agent",
+  "provides": "whatsapp_api",
+  "config_schema": {
+    "app_secret": {
+      "type": "secret",
+      "env": "WHATSAPP_API_APP_SECRET",
+      "description": "Meta app secret for webhook HMAC validation",
+      "required": true
+    },
+    "verify_token": {
+      "type": "secret",
+      "env": "WHATSAPP_API_VERIFY_TOKEN",
+      "description": "Token for webhook verification handshake",
+      "required": true
+    },
+    "access_token": {
+      "type": "secret",
+      "env": "WHATSAPP_API_ACCESS_TOKEN",
+      "description": "Meta API access token (System User or temporary)",
+      "required": true
+    }
+  },
+  "public_api": true,
+  "public_api_prefix": "/api/whatsapp-meta",
+  "conflicts": ["whatsapp_evolution"],
+  "dependencies": {
+    "required": ["sessions", "attachments"],
+    "optional": ["memory", "adversarial", "image", "transcription", "tts"]
+  }
+}

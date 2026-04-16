@@ -1,0 +1,241 @@
+{% extends "plugins/plugin_base.html" %}
+
+{% block plugin_content_after %}
+<!-- Webhook URL -->
+<div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
+    <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-green-500/5 to-transparent">
+        <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
+            <i class="fas fa-link text-green-500"></i>
+            Webhook URL
+        </h3>
+        <p class="text-sm text-void-500 dark:text-void-400 mt-1">
+            Copy this URL into your Meta App Dashboard under WhatsApp &rarr; Configuration &rarr; Webhook URL.
+        </p>
+    </div>
+    <div class="p-5">
+        <div class="flex items-center gap-2">
+            <input type="text" id="webhook-url" readonly
+                   value="{{ webhook_url }}"
+                   class="flex-1 bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white font-mono text-sm focus:outline-none">
+            <button onclick="copyWebhookUrl()"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium transition-all">
+                <i class="fas fa-copy" id="copy-icon"></i>
+                <span id="copy-text">Copy</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Authorized Numbers -->
+<div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden" x-data="authorizedNumbers()">
+    <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-green-500/5 to-transparent">
+        <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
+            <i class="fas fa-phone text-green-500"></i>
+            Authorized Numbers
+        </h3>
+        <p class="text-sm text-void-500 dark:text-void-400 mt-1">
+            When empty, all numbers are accepted (open mode). Add numbers to restrict access.
+        </p>
+    </div>
+    <div class="p-5">
+        <!-- Add form -->
+        <div class="flex flex-wrap gap-2 mb-4">
+            <input type="text" x-model="newPhoneNumberId" placeholder="Phone Number ID"
+                   class="flex-1 min-w-[140px] bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2 px-3 text-sm text-void-900 dark:text-white focus:outline-none focus:border-green-500/50">
+            <input type="text" x-model="newPhone" placeholder="Phone (e.g. 393401234567)"
+                   class="flex-1 min-w-[140px] bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2 px-3 text-sm text-void-900 dark:text-white focus:outline-none focus:border-green-500/50">
+            <input type="text" x-model="newLabel" placeholder="Label (optional)"
+                   class="flex-1 min-w-[100px] bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2 px-3 text-sm text-void-900 dark:text-white focus:outline-none focus:border-green-500/50">
+            <button @click="addNumber()" :disabled="!newPhoneNumberId || !newPhone"
+                    class="px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-all disabled:opacity-50">
+                <i class="fas fa-plus mr-1"></i> Add
+            </button>
+        </div>
+        <!-- List -->
+        <div x-show="numbers.length === 0" class="text-sm text-amber-500 flex items-center gap-2 py-2">
+            <i class="fas fa-triangle-exclamation"></i>
+            Open mode: all incoming numbers are accepted.
+        </div>
+        <template x-for="num in numbers" :key="num.id">
+            <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-void-50 dark:hover:bg-void-800/30 group">
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-mono text-void-700 dark:text-void-300" x-text="num.phone"></span>
+                    <span class="text-xs text-void-400" x-text="num.label || ''"></span>
+                    <span class="text-[10px] text-void-400 font-mono" x-text="'(' + num.phone_number_id + ')'"></span>
+                </div>
+                <button @click="removeNumber(num.id)"
+                        class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-void-400 hover:text-red-500 transition-all">
+                    <i class="fas fa-trash-can text-xs"></i>
+                </button>
+            </div>
+        </template>
+        <div x-show="error" class="text-sm text-red-500 mt-2" x-text="error"></div>
+    </div>
+</div>
+
+<!-- Test Message -->
+<div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
+    <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-green-500/5 to-transparent">
+        <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
+            <i class="fa-brands fa-whatsapp text-green-500"></i>
+            Send Test Message
+        </h3>
+        <p class="text-sm text-void-500 dark:text-void-400 mt-1">
+            Verify your configuration by sending a test message.
+        </p>
+    </div>
+    <div class="p-5 space-y-4">
+        {% include "partials/csrf_field.html" %}
+        <div>
+            <label class="block text-sm font-medium text-void-700 dark:text-void-300 mb-1">Phone Number ID</label>
+            <input type="text" id="test-phone-number-id" placeholder="e.g. 123456789012345"
+                   class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white focus:outline-none focus:border-green-500/50 transition-all">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-void-700 dark:text-void-300 mb-1">Access Token Secret Key</label>
+            <input type="text" id="test-access-token-secret" placeholder="e.g. WHATSAPP_API_ACCESS_TOKEN"
+                   class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white focus:outline-none focus:border-green-500/50 transition-all">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-void-700 dark:text-void-300 mb-1">Recipient Phone</label>
+            <input type="text" id="test-phone" placeholder="e.g. 391234567890"
+                   class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white focus:outline-none focus:border-green-500/50 transition-all">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-void-700 dark:text-void-300 mb-1">Message Text</label>
+            <input type="text" id="test-text" placeholder="Hello from GridBear!" value="Hello from GridBear!"
+                   class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white focus:outline-none focus:border-green-500/50 transition-all">
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="sendTestMessage()" id="test-btn"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium transition-all">
+                <i class="fas fa-paper-plane" id="test-btn-icon"></i>
+                <span id="test-btn-text">Send Test</span>
+            </button>
+            <span id="test-result" class="text-sm"></span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block plugin_extra_js %}
+<script>
+function authorizedNumbers() {
+    return {
+        numbers: [],
+        newPhoneNumberId: '',
+        newPhone: '',
+        newLabel: '',
+        error: '',
+        init() { this.loadNumbers(); },
+        async loadNumbers() {
+            try {
+                const resp = await fetch('authorized');
+                this.numbers = await resp.json();
+            } catch (e) { this.error = 'Failed to load numbers'; }
+        },
+        async addNumber() {
+            this.error = '';
+            const csrfToken = document.querySelector('[name=csrf_token]')?.value || '';
+            try {
+                const resp = await fetch('authorized/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                    body: JSON.stringify({
+                        phone_number_id: this.newPhoneNumberId,
+                        phone: this.newPhone,
+                        label: this.newLabel,
+                    }),
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    this.newPhone = '';
+                    this.newLabel = '';
+                    await this.loadNumbers();
+                } else {
+                    this.error = data.error || 'Failed to add';
+                }
+            } catch (e) { this.error = 'Request failed'; }
+        },
+        async removeNumber(id) {
+            this.error = '';
+            const csrfToken = document.querySelector('[name=csrf_token]')?.value || '';
+            try {
+                const resp = await fetch('authorized/remove', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                    body: JSON.stringify({id: id}),
+                });
+                const data = await resp.json();
+                if (data.ok) { await this.loadNumbers(); }
+                else { this.error = data.error || 'Failed to remove'; }
+            } catch (e) { this.error = 'Request failed'; }
+        },
+    };
+}
+
+function copyWebhookUrl() {
+    const input = document.getElementById('webhook-url');
+    navigator.clipboard.writeText(input.value).then(function() {
+        const icon = document.getElementById('copy-icon');
+        const text = document.getElementById('copy-text');
+        icon.className = 'fas fa-check';
+        text.textContent = 'Copied!';
+        setTimeout(function() {
+            icon.className = 'fas fa-copy';
+            text.textContent = 'Copy';
+        }, 2000);
+    });
+}
+
+async function sendTestMessage() {
+    const btn = document.getElementById('test-btn');
+    const btnIcon = document.getElementById('test-btn-icon');
+    const btnText = document.getElementById('test-btn-text');
+    const result = document.getElementById('test-result');
+    const csrfToken = document.querySelector('[name=csrf_token]')?.value || '';
+
+    const phone_number_id = document.getElementById('test-phone-number-id').value.trim();
+    const access_token_secret = document.getElementById('test-access-token-secret').value.trim();
+    const phone = document.getElementById('test-phone').value.trim();
+    const text = document.getElementById('test-text').value.trim();
+
+    if (!phone_number_id || !access_token_secret || !phone || !text) {
+        result.textContent = 'All fields are required';
+        result.className = 'text-sm text-red-500';
+        return;
+    }
+
+    btn.disabled = true;
+    btnIcon.className = 'fas fa-spinner fa-spin';
+    btnText.textContent = 'Sending...';
+    result.textContent = '';
+
+    try {
+        const resp = await fetch('test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+            },
+            body: JSON.stringify({ phone_number_id, access_token_secret, phone, text }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            result.textContent = 'Message sent successfully!';
+            result.className = 'text-sm text-green-500';
+        } else {
+            result.textContent = data.error || 'Failed to send message';
+            result.className = 'text-sm text-red-500';
+        }
+    } catch (err) {
+        result.textContent = 'Request failed: ' + err.message;
+        result.className = 'text-sm text-red-500';
+    } finally {
+        btn.disabled = false;
+        btnIcon.className = 'fas fa-paper-plane';
+        btnText.textContent = 'Send Test';
+    }
+}
+</script>
+{% endblock %}
