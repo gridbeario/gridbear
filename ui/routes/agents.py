@@ -554,6 +554,8 @@ async def save_agent_config(
 
     if avatar_value:
         config["avatar"] = avatar_value
+    elif existing_config.get("avatar"):
+        config["avatar"] = existing_config["avatar"]
 
     # Channels - read dynamically from form data
     form_data = await request.form()
@@ -603,6 +605,11 @@ async def save_agent_config(
 
     # Plugins - always save what form sends
     config["plugins"] = {"enabled": plugins_enabled}
+
+    # Preserve fields not managed by the form
+    for preserve_key in ("context_options", "services"):
+        if preserve_key in existing_config and preserve_key not in config:
+            config[preserve_key] = existing_config[preserve_key]
 
     save_agent(agent_id, config)
 
