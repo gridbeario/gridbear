@@ -554,6 +554,8 @@ async def save_agent_config(
 
     if avatar_value:
         config["avatar"] = avatar_value
+    elif existing_config.get("avatar"):
+        config["avatar"] = existing_config["avatar"]
 
     # Channels - read dynamically from form data
     form_data = await request.form()
@@ -564,7 +566,10 @@ async def save_agent_config(
         users_key = f"{ch_name}_allowed_users"
         token_value = form_data.get(token_key, "")
         if token_value:
-            ch_config = {"token_secret": token_value}
+            # Preserve existing channel config (e.g. phone_number_id)
+            # and only update form-managed fields
+            ch_config = channels.get(ch_name, {}).copy()
+            ch_config["token_secret"] = token_value
             allowed = form_data.getlist(users_key)
             if allowed:
                 ch_config["allowed_users"] = [u.strip() for u in allowed if u.strip()]
@@ -600,6 +605,11 @@ async def save_agent_config(
 
     # Plugins - always save what form sends
     config["plugins"] = {"enabled": plugins_enabled}
+
+    # Preserve fields not managed by the form
+    for preserve_key in ("context_options", "services"):
+        if preserve_key in existing_config and preserve_key not in config:
+            config[preserve_key] = existing_config[preserve_key]
 
     save_agent(agent_id, config)
 
