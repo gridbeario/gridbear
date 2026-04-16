@@ -500,14 +500,22 @@ class AgentAwareMessageProcessor(MessageProcessor):
         if not unified_id and username_lower:
             unified_id = get_unified_user_id(message.platform, username_lower)
 
+        # Service account override: use the agent's own identity for MCP
+        # permissions and gateway context (e.g. bot agents with their own
+        # Odoo credentials). The sender's unified_id is kept for memories.
+        ctx_opts = self.agent_context.get("context_options", {})
+        service_account = ctx_opts.get("service_account")
+        mcp_unified_id = service_account if service_account else unified_id
+
         extra_servers = []
         shared_accounts = {}
-        if unified_id:
-            shared_accounts = get_group_shared_accounts(unified_id)
+        if mcp_unified_id:
+            shared_accounts = get_group_shared_accounts(mcp_unified_id)
             for plugin_name, accounts in shared_accounts.items():
                 extra_servers.extend(
                     _expand_shared_accounts(self.plugin_manager, plugin_name, accounts)
                 )
+        if unified_id:
             # User locale can override agent locale if set
             user_locale = get_user_locale(unified_id) or user_locale
 
@@ -515,7 +523,7 @@ class AgentAwareMessageProcessor(MessageProcessor):
             username=username_lower,
             platform=message.platform,
             is_group_chat=message.is_group_chat,
-            unified_id=unified_id,
+            unified_id=mcp_unified_id,
             agent_mcp_permissions=agent_mcp_permissions or None,
             extra_servers=extra_servers,
         )
@@ -538,9 +546,6 @@ class AgentAwareMessageProcessor(MessageProcessor):
         builder.set_locale(user_locale)
         builder.set_voice_response(message.respond_with_voice)
         builder.set_allowed_mcp_servers(hook_data.mcp_permissions)
-
-        # Agent-level context_options for lightweight prompts (e.g. Ollama)
-        ctx_opts = self.agent_context.get("context_options", {})
 
         if not ctx_opts.get("skip_calendars"):
             builder.set_shared_accounts(shared_accounts)
@@ -596,8 +601,6 @@ class AgentAwareMessageProcessor(MessageProcessor):
         # was recycled — load more history so Claude can recover context
         is_cold_start = bool(session and not session.runner_session_id)
 
-        # Agent-level context_options for lightweight prompts (e.g. Ollama)
-        ctx_opts = self.agent_context.get("context_options", {})
         mem_limit = ctx_opts.get("memories", 5)
         hist_limit = ctx_opts.get("history_limit", 20 if is_cold_start else 10)
         hist_chars = ctx_opts.get("history_max_chars", 6000 if is_cold_start else 3000)
@@ -710,7 +713,7 @@ class AgentAwareMessageProcessor(MessageProcessor):
             agent_id=agent_id,
             model=agent_model or None,
             system_prompt=agent_system_prompt,
-            unified_id=unified_id,
+            unified_id=mcp_unified_id,
             max_tools=agent_max_tools,
             tool_loading=agent_tool_loading,
         )
