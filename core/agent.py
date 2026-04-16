@@ -225,8 +225,17 @@ class Agent:
         self._channels[platform] = channel
 
     def get_channel(self, platform: str) -> "BaseChannel | None":
-        """Get channel by platform name."""
-        return self._channels.get(platform)
+        """Get channel by platform name or plugin name."""
+        # Direct lookup by plugin name (e.g. "whatsapp_api", "telegram")
+        ch = self._channels.get(platform)
+        if ch:
+            return ch
+        # Fallback: search by channel's platform attribute
+        # (e.g. whatsapp_api plugin declares platform = "whatsapp")
+        for channel in self._channels.values():
+            if getattr(channel, "platform", None) == platform:
+                return channel
+        return None
 
     def get_channel_names(self) -> list[str]:
         """Return list of available channel platform names."""

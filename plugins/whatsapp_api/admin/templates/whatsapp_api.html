@@ -1,6 +1,38 @@
 {% extends "plugins/plugin_base.html" %}
 
 {% block plugin_content_after %}
+<!-- Agent Phone Numbers -->
+<div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
+    <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-green-500/5 to-transparent">
+        <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
+            <i class="fas fa-robot text-green-500"></i>
+            Agent Phone Numbers
+        </h3>
+        <p class="text-sm text-void-500 dark:text-void-400 mt-1">
+            Configure the Meta Phone Number ID for each agent using WhatsApp.
+        </p>
+    </div>
+    <div class="p-5 space-y-3">
+        {% for ac in agent_channels %}
+        <div class="flex items-center gap-3" id="agent-ch-{{ ac.agent_id }}">
+            <span class="text-sm font-medium text-void-700 dark:text-void-300 w-32">{{ ac.agent_name }}</span>
+            <input type="text" value="{{ ac.phone_number_id }}"
+                   id="pnid-{{ ac.agent_id }}"
+                   placeholder="Phone Number ID"
+                   class="flex-1 bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2 px-3 text-sm font-mono text-void-900 dark:text-white focus:outline-none focus:border-green-500/50">
+            <button onclick="savePhoneNumberId('{{ ac.agent_id }}')"
+                    class="px-3 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-all">
+                <i class="fas fa-save"></i>
+            </button>
+            <span id="pnid-status-{{ ac.agent_id }}" class="text-xs"></span>
+        </div>
+        {% endfor %}
+        {% if not agent_channels %}
+        <p class="text-sm text-void-400">No agents have whatsapp_api configured in their channels.</p>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Webhook URL -->
 <div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
     <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-green-500/5 to-transparent">
@@ -120,6 +152,26 @@
 
 {% block plugin_extra_js %}
 <script>
+async function savePhoneNumberId(agentId) {
+    const input = document.getElementById('pnid-' + agentId);
+    const status = document.getElementById('pnid-status-' + agentId);
+    const csrfToken = document.querySelector('[name=csrf_token]')?.value || '';
+    try {
+        const resp = await fetch('agent-channel', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+            body: JSON.stringify({agent_id: agentId, phone_number_id: input.value.trim()}),
+        });
+        const data = await resp.json();
+        status.textContent = data.ok ? 'Saved' : data.error;
+        status.className = 'text-xs ' + (data.ok ? 'text-green-500' : 'text-red-500');
+        setTimeout(function() { status.textContent = ''; }, 3000);
+    } catch (e) {
+        status.textContent = 'Error';
+        status.className = 'text-xs text-red-500';
+    }
+}
+
 function authorizedNumbers() {
     return {
         numbers: [],
