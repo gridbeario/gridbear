@@ -43,6 +43,69 @@ async def whatsapp_api_dashboard(request: Request, _=Depends(require_login)):
     )
 
 
+@router.get("/authorized", response_class=JSONResponse)
+async def list_authorized(request: Request, _=Depends(require_login)):
+    """List all authorized numbers."""
+    from plugins.whatsapp_api.models import AuthorizedNumber
+
+    rows = AuthorizedNumber.search_sync([])
+    return JSONResponse(
+        [
+            {
+                "id": r["id"],
+                "phone_number_id": r["phone_number_id"],
+                "phone": r["phone"],
+                "label": r.get("label", ""),
+            }
+            for r in rows
+        ]
+    )
+
+
+@router.post("/authorized/add", response_class=JSONResponse)
+async def add_authorized(request: Request, _=Depends(require_login)):
+    """Add an authorized number."""
+    from plugins.whatsapp_api.models import AuthorizedNumber
+
+    body = await request.json()
+    phone_number_id = body.get("phone_number_id", "").strip()
+    phone = body.get("phone", "").strip()
+    label = body.get("label", "").strip()
+
+    if not phone_number_id or not phone:
+        return JSONResponse(
+            {"ok": False, "error": "phone_number_id and phone are required"},
+            status_code=400,
+        )
+
+    try:
+        AuthorizedNumber.create_sync(
+            phone_number_id=phone_number_id,
+            phone=phone,
+            label=label or None,
+        )
+        return JSONResponse({"ok": True})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+
+
+@router.post("/authorized/remove", response_class=JSONResponse)
+async def remove_authorized(request: Request, _=Depends(require_login)):
+    """Remove an authorized number."""
+    from plugins.whatsapp_api.models import AuthorizedNumber
+
+    body = await request.json()
+    row_id = body.get("id")
+    if not row_id:
+        return JSONResponse({"ok": False, "error": "id is required"}, status_code=400)
+
+    try:
+        AuthorizedNumber.delete_sync(id=row_id)
+        return JSONResponse({"ok": True})
+    except Exception as exc:
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=400)
+
+
 @router.post("/test")
 async def send_test_message(request: Request, _=Depends(require_login)):
     """Send a test message via Meta WhatsApp API."""

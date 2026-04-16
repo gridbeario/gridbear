@@ -26,6 +26,53 @@
     </div>
 </div>
 
+<!-- Authorized Numbers -->
+<div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden" x-data="authorizedNumbers()">
+    <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-green-500/5 to-transparent">
+        <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
+            <i class="fas fa-phone text-green-500"></i>
+            Authorized Numbers
+        </h3>
+        <p class="text-sm text-void-500 dark:text-void-400 mt-1">
+            When empty, all numbers are accepted (open mode). Add numbers to restrict access.
+        </p>
+    </div>
+    <div class="p-5">
+        <!-- Add form -->
+        <div class="flex flex-wrap gap-2 mb-4">
+            <input type="text" x-model="newPhoneNumberId" placeholder="Phone Number ID"
+                   class="flex-1 min-w-[140px] bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2 px-3 text-sm text-void-900 dark:text-white focus:outline-none focus:border-green-500/50">
+            <input type="text" x-model="newPhone" placeholder="Phone (e.g. 393401234567)"
+                   class="flex-1 min-w-[140px] bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2 px-3 text-sm text-void-900 dark:text-white focus:outline-none focus:border-green-500/50">
+            <input type="text" x-model="newLabel" placeholder="Label (optional)"
+                   class="flex-1 min-w-[100px] bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2 px-3 text-sm text-void-900 dark:text-white focus:outline-none focus:border-green-500/50">
+            <button @click="addNumber()" :disabled="!newPhoneNumberId || !newPhone"
+                    class="px-4 py-2 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-all disabled:opacity-50">
+                <i class="fas fa-plus mr-1"></i> Add
+            </button>
+        </div>
+        <!-- List -->
+        <div x-show="numbers.length === 0" class="text-sm text-amber-500 flex items-center gap-2 py-2">
+            <i class="fas fa-triangle-exclamation"></i>
+            Open mode: all incoming numbers are accepted.
+        </div>
+        <template x-for="num in numbers" :key="num.id">
+            <div class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-void-50 dark:hover:bg-void-800/30 group">
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-mono text-void-700 dark:text-void-300" x-text="num.phone"></span>
+                    <span class="text-xs text-void-400" x-text="num.label || ''"></span>
+                    <span class="text-[10px] text-void-400 font-mono" x-text="'(' + num.phone_number_id + ')'"></span>
+                </div>
+                <button @click="removeNumber(num.id)"
+                        class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-void-400 hover:text-red-500 transition-all">
+                    <i class="fas fa-trash-can text-xs"></i>
+                </button>
+            </div>
+        </template>
+        <div x-show="error" class="text-sm text-red-500 mt-2" x-text="error"></div>
+    </div>
+</div>
+
 <!-- Test Message -->
 <div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
     <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-green-500/5 to-transparent">
@@ -73,6 +120,60 @@
 
 {% block plugin_extra_js %}
 <script>
+function authorizedNumbers() {
+    return {
+        numbers: [],
+        newPhoneNumberId: '',
+        newPhone: '',
+        newLabel: '',
+        error: '',
+        init() { this.loadNumbers(); },
+        async loadNumbers() {
+            try {
+                const resp = await fetch('authorized');
+                this.numbers = await resp.json();
+            } catch (e) { this.error = 'Failed to load numbers'; }
+        },
+        async addNumber() {
+            this.error = '';
+            const csrfToken = document.querySelector('[name=csrf_token]')?.value || '';
+            try {
+                const resp = await fetch('authorized/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                    body: JSON.stringify({
+                        phone_number_id: this.newPhoneNumberId,
+                        phone: this.newPhone,
+                        label: this.newLabel,
+                    }),
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    this.newPhone = '';
+                    this.newLabel = '';
+                    await this.loadNumbers();
+                } else {
+                    this.error = data.error || 'Failed to add';
+                }
+            } catch (e) { this.error = 'Request failed'; }
+        },
+        async removeNumber(id) {
+            this.error = '';
+            const csrfToken = document.querySelector('[name=csrf_token]')?.value || '';
+            try {
+                const resp = await fetch('authorized/remove', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken},
+                    body: JSON.stringify({id: id}),
+                });
+                const data = await resp.json();
+                if (data.ok) { await this.loadNumbers(); }
+                else { this.error = data.error || 'Failed to remove'; }
+            } catch (e) { this.error = 'Request failed'; }
+        },
+    };
+}
+
 function copyWebhookUrl() {
     const input = document.getElementById('webhook-url');
     navigator.clipboard.writeText(input.value).then(function() {
