@@ -657,6 +657,25 @@ class AgentAwareMessageProcessor(MessageProcessor):
         else:
             hook_data.session_id = session.runner_session_id if session else None
 
+            # Session TTL: invalidate runner session if too old
+            session_ttl = ctx_opts.get("session_ttl_minutes")
+            if session_ttl and session and session.runner_session_id:
+                try:
+                    from datetime import datetime, timedelta, timezone
+
+                    last_update = session.updated_at
+                    if last_update.tzinfo is None:
+                        last_update = last_update.replace(tzinfo=timezone.utc)
+                    age = datetime.now(timezone.utc) - last_update
+                    if age > timedelta(minutes=int(session_ttl)):
+                        logger.info(
+                            "Session TTL expired (%d min), starting fresh",
+                            session_ttl,
+                        )
+                        hook_data.session_id = None
+                except Exception as exc:
+                    logger.debug("Session TTL check failed: %s", exc)
+
         # HOOK: after_context_build
         hook_data = await self.hooks.execute(
             HookName.AFTER_CONTEXT_BUILD,
