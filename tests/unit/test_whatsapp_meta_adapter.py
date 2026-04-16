@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from plugins.whatsapp_api import registry
 from plugins.whatsapp_api.adapter import (
     DEDUP_TTL,
     WhatsAppMetaChannel,
@@ -15,10 +16,10 @@ from plugins.whatsapp_api.adapter import (
 
 @pytest.fixture(autouse=True)
 def _clear_registry():
-    """Ensure class registry is clean before/after each test."""
-    WhatsAppMetaChannel._channels.clear()
+    """Ensure module-level registry is clean before/after each test."""
+    registry._channels.clear()
     yield
-    WhatsAppMetaChannel._channels.clear()
+    registry._channels.clear()
 
 
 @pytest.fixture
