@@ -53,6 +53,7 @@ class AgentManager:
         self._agents: dict[str, Agent] = {}
         self._health_check_task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
+        self._handler_factory = None
 
     def _resolve_env_vars(self, config: dict) -> dict:
         """Resolve ${ENV_VAR} references in configuration.
@@ -405,11 +406,13 @@ class AgentManager:
         """Set message handlers for all agent channels.
 
         This should be called after agents are loaded to avoid circular imports.
+        The factory is saved for use during single-agent hot-reloads.
 
         Args:
             handler_factory: Callable that takes (plugin_manager, agent_context)
                             and returns a message handler function
         """
+        self._handler_factory = handler_factory
         for agent in self._agents.values():
             for channel in agent._channels.values():
                 handler = handler_factory(
@@ -578,6 +581,14 @@ class AgentManager:
 
         # Swap in registry
         self._agents[agent_id] = new_agent
+
+        # Set message handlers on new channels (same factory as initial load)
+        if self._handler_factory:
+            for channel in new_agent._channels.values():
+                handler = self._handler_factory(
+                    self.plugin_manager, channel.get_agent_context()
+                )
+                channel.set_message_handler(handler)
 
         # Start new agent
         try:
