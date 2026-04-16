@@ -652,6 +652,7 @@ class AgentAwareMessageProcessor(MessageProcessor):
         # Workflow steps get a fresh runner session (no --resume) to avoid
         # contamination from previous conversations.
         _source = inter_agent_context.get("source", "") if inter_agent_context else ""
+        _session_ttl_expired = False
         if _source == "workflow":
             hook_data.session_id = None
         else:
@@ -659,7 +660,6 @@ class AgentAwareMessageProcessor(MessageProcessor):
 
             # Session TTL: invalidate runner session if too old
             session_ttl = ctx_opts.get("session_ttl_minutes")
-            _session_ttl_expired = False
             if session_ttl and session and session.runner_session_id:
                 try:
                     from datetime import datetime, timedelta, timezone
