@@ -659,6 +659,7 @@ class AgentAwareMessageProcessor(MessageProcessor):
 
             # Session TTL: invalidate runner session if too old
             session_ttl = ctx_opts.get("session_ttl_minutes")
+            _session_ttl_expired = False
             if session_ttl and session and session.runner_session_id:
                 try:
                     from datetime import datetime, timedelta, timezone
@@ -673,6 +674,7 @@ class AgentAwareMessageProcessor(MessageProcessor):
                             session_ttl,
                         )
                         hook_data.session_id = None
+                        _session_ttl_expired = True
                 except Exception as exc:
                     logger.debug("Session TTL check failed: %s", exc)
 
@@ -761,6 +763,14 @@ class AgentAwareMessageProcessor(MessageProcessor):
 
         hook_data.response_text = response.text
         hook_data.session_id = response.session_id
+
+        # Prefix response with TTL notice if session was reset
+        if _session_ttl_expired and not response.is_error and response.text:
+            ttl_msg = ctx_opts.get(
+                "session_ttl_message",
+                "_(Conversazione precedente chiusa per inattività)_",
+            )
+            hook_data.response_text = f"{ttl_msg}\n\n{response.text}"
 
         # Plan execution: mark task completed after runner response
         if _active_task and _conv_id and not response.is_error:
