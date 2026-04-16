@@ -564,7 +564,10 @@ async def save_agent_config(
         users_key = f"{ch_name}_allowed_users"
         token_value = form_data.get(token_key, "")
         if token_value:
-            ch_config = {"token_secret": token_value}
+            # Preserve existing channel config (e.g. phone_number_id)
+            # and only update form-managed fields
+            ch_config = channels.get(ch_name, {}).copy()
+            ch_config["token_secret"] = token_value
             allowed = form_data.getlist(users_key)
             if allowed:
                 ch_config["allowed_users"] = [u.strip() for u in allowed if u.strip()]
