@@ -74,7 +74,8 @@ logs/
 # Claude Code container config (contains personal info)
 .claude.container.json
 
-# Local docker-compose overrides
+# Local docker-compose (customize from docker-compose.yml.example)
+docker-compose.yml
 docker-compose.override.yml
 
 # Ignore notes/docs but keep important files
