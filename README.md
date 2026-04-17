@@ -77,6 +77,7 @@ cd gridbear
 
 # Configure
 cp .env.example .env
+cp docker-compose.yml.example docker-compose.yml
 
 # Optional: enable extra services (executor, WhatsApp, Ollama, n8n)
 cp docker-compose.override.yml.example docker-compose.override.yml
