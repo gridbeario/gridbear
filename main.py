@@ -1269,13 +1269,12 @@ async def main():
     agents_list = agent_manager.list_agents()
 
     if not agents_list:
-        logger.error(
+        logger.warning(
             "No agents configured. "
-            "Add a YAML file in config/agents/ or use the Admin UI at %s to create one. "
-            "See config/agents/ for .example files.",
+            "Use the Admin UI at %s to create one. "
+            "Messaging features are disabled until at least one agent exists.",
             os.environ.get("GRIDBEAR_BASE_URL", "http://localhost:8088"),
         )
-        sys.exit(1)
 
     logger.info(
         f"Loaded {len(agents_list)} agent(s): {[a['name'] for a in agents_list]}"
