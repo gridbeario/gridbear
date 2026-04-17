@@ -11,6 +11,7 @@ services:
       - .env
     volumes:
       - ./data:/app/data
+      - ./data/avatars:/app/ui/static/avatars
       - ./credentials:/app/credentials
       - ./config:/app/config
       - claude_state:/home/gridbear/.claude
