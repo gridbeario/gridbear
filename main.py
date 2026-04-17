@@ -1243,12 +1243,13 @@ async def main():
     set_plugin_manager(plugin_manager)
 
     if not plugin_manager.runners:
-        logger.error(
+        logger.warning(
             "No runner plugin enabled. "
-            "Enable at least one runner (e.g. claude) via the admin UI plugin manager."
+            "Enable at least one runner (e.g. claude) via the admin UI plugin manager. "
+            "Agents will not respond to messages until a runner is configured."
         )
-        sys.exit(1)
-    logger.info(f"Runners loaded: {list(plugin_manager.runners.keys())}")
+    else:
+        logger.info(f"Runners loaded: {list(plugin_manager.runners.keys())}")
 
     # Log MCP servers count (config is generated on-demand, never written to disk)
     mcp_servers = plugin_manager.get_all_mcp_server_names()
