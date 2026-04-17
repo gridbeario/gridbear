@@ -439,9 +439,9 @@ async def migrate_create_default_company() -> bool:
         # 1. Create default company with OVERRIDING SYSTEM VALUE to force id=1
         await conn.execute(
             """
-            INSERT INTO app.companies (id, name, slug, active, locale, timezone, plan)
+            INSERT INTO app.companies (id, name, slug, active, locale, timezone)
             OVERRIDING SYSTEM VALUE
-            VALUES (1, 'Default', 'default', TRUE, 'en', 'UTC', 'free')
+            VALUES (1, 'Default', 'default', TRUE, 'en', 'UTC')
             ON CONFLICT (id) DO NOTHING
             """
         )
