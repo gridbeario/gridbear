@@ -7,3 +7,4 @@ Importing this module triggers ModelMeta registration for all core models.
 from core.models.company import Company  # noqa: F401
 from core.models.company_user import CompanyUser  # noqa: F401
 from core.models.user import User  # noqa: F401
+from core.system_config import SystemConfig  # noqa: F401
