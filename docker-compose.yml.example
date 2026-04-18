@@ -12,7 +12,6 @@ services:
     volumes:
       - ./data:/app/data
       - ./data/avatars:/app/ui/static/avatars
-      - ./data/artifacts:/app/data/artifacts
       - ./credentials:/app/credentials
       - ./config:/app/config
       - claude_state:/home/gridbear/.claude

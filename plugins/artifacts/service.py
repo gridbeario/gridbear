@@ -1,14 +1,14 @@
-"""Artifacts plugin service + MCP LocalToolProvider.
+"""Artifacts plugin service.
 
 Known v1 limitations
 --------------------
-The MCP tool handler (``ArtifactsToolProvider.handle_tool_call``) does not
-currently receive ``conversation_id`` from the MCP gateway / runner context,
-so artifacts created via the ``artifacts__create_artifact`` tool are persisted
-with ``conversation_id=NULL``. This is intentional for v1: threading the
-conversation id through the gateway kwargs is a v2 task (see TODO in
-``handle_tool_call``), and until then ``/me/artifacts`` cannot filter
-tool-created artifacts by thread.
+The MCP tool handler (``ArtifactsToolProvider.handle_tool_call``, defined in
+``virtual_tools.py``) does not currently receive ``conversation_id`` from the
+MCP gateway / runner context, so artifacts created via the
+``artifacts__create_artifact`` tool are persisted with ``conversation_id=NULL``.
+This is intentional for v1: threading the conversation id through the gateway
+kwargs is a v2 task (see TODO in ``handle_tool_call``), and until then
+``/me/artifacts`` cannot filter tool-created artifacts by thread.
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ import logging
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from core.interfaces.local_tools import LocalToolProvider
 from plugins.artifacts import storage
 from plugins.artifacts.hooks import (
     start_cleanup_worker,  # noqa: F401 — hook registration
@@ -27,7 +26,6 @@ from plugins.artifacts.signing import build_capability_url
 
 _logger = logging.getLogger(__name__)
 
-_SERVER_NAME = "artifacts"
 _DEFAULT_TTL_DAYS = 30
 _DEFAULT_MAX_HTML = 2_097_152
 
@@ -117,91 +115,3 @@ class ArtifactsService:
     async def hard_delete(self, artifact_id: str) -> None:
         storage.delete_artifact(artifact_id)
         await Artifact.delete(artifact_id)
-
-
-_TOOLS = [
-    {
-        "name": "artifacts__create_artifact",
-        "description": (
-            "Create a standalone HTML artifact (dashboard, chart, data viewer). "
-            "Returns a public URL the user can click. Keep HTML self-contained: "
-            "inline CSS and JS. External libraries only from esm.sh / unpkg / "
-            "cdn.jsdelivr.net. Embed data directly; the CSP blocks runtime fetch. "
-            "Pass pin=true to exempt the 30-day TTL."
-        ),
-        "inputSchema": {
-            "type": "object",
-            "required": ["title", "html"],
-            "properties": {
-                "title": {"type": "string", "maxLength": 200},
-                "html": {"type": "string"},
-                "pin": {"type": "boolean"},
-                "ttl_days": {"type": "integer", "minimum": 1, "maximum": 365},
-            },
-        },
-    }
-]
-
-
-class ArtifactsToolProvider(LocalToolProvider):
-    """Expose the create_artifact MCP tool to agents."""
-
-    def __init__(self) -> None:
-        self._service = ArtifactsService()
-
-    def get_server_name(self) -> str:
-        return _SERVER_NAME
-
-    def get_tools(self) -> list[dict]:
-        return list(_TOOLS)
-
-    async def handle_tool_call(
-        self, tool_name: str, arguments: dict, **kwargs
-    ) -> list[dict]:
-        if tool_name != "artifacts__create_artifact":
-            return [{"type": "text", "text": f"Unknown artifacts tool: {tool_name}"}]
-
-        # TODO(v2): thread conversation_id through from the MCP gateway
-        # (kwargs.get("conversation_id")) so /me/artifacts can filter by thread.
-        # Current v1 leaves the field NULL for tool-created artifacts.
-        agent_name = kwargs.get("agent_name")
-        oauth2_user = kwargs.get("oauth2_user")
-        if not agent_name or not oauth2_user:
-            _logger.error(
-                "artifacts__create_artifact invoked without agent/user context "
-                "(agent=%r, user=%r) — refusing",
-                agent_name,
-                oauth2_user,
-            )
-            return [
-                {
-                    "type": "text",
-                    "text": (
-                        "Error: artifact creation requires authenticated "
-                        "agent and user context."
-                    ),
-                }
-            ]
-
-        try:
-            result = await self._service.create(
-                title=arguments["title"],
-                html=arguments["html"],
-                agent_id=agent_name,
-                owner_user_id=oauth2_user,
-                pin=bool(arguments.get("pin", False)),
-                ttl_days=arguments.get("ttl_days"),
-            )
-            return [
-                {
-                    "type": "text",
-                    "text": (
-                        f"Artifact created: {result['title']}\n"
-                        f"URL: {result['url']}\n"
-                        f"Expires: {result['expires_at']}"
-                    ),
-                }
-            ]
-        except Exception as err:
-            _logger.exception("Failed to create artifact: %s", err)
-            return [{"type": "text", "text": f"Error creating artifact: {err}"}]

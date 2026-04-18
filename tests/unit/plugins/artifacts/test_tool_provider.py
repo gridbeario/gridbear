@@ -6,27 +6,27 @@ import pytest
 
 
 def test_server_name():
-    from plugins.artifacts.service import ArtifactsToolProvider
+    from plugins.artifacts.virtual_tools import ArtifactsToolProvider
 
     assert ArtifactsToolProvider().get_server_name() == "artifacts"
 
 
 def test_tools_contain_create_artifact():
-    from plugins.artifacts.service import ArtifactsToolProvider
+    from plugins.artifacts.virtual_tools import ArtifactsToolProvider
 
     names = [t["name"] for t in ArtifactsToolProvider().get_tools()]
     assert "artifacts__create_artifact" in names
 
 
 async def test_unknown_tool_returns_error_text():
-    from plugins.artifacts.service import ArtifactsToolProvider
+    from plugins.artifacts.virtual_tools import ArtifactsToolProvider
 
     out = await ArtifactsToolProvider().handle_tool_call("artifacts__nope", {})
     assert "Unknown" in out[0]["text"]
 
 
 async def test_missing_identity_returns_error(hmac_secret):
-    from plugins.artifacts.service import ArtifactsToolProvider
+    from plugins.artifacts.virtual_tools import ArtifactsToolProvider
 
     out = await ArtifactsToolProvider().handle_tool_call(
         "artifacts__create_artifact",
@@ -46,7 +46,7 @@ async def test_create_tool_success(
     db_initialised, tmp_data_dir, hmac_secret, monkeypatch
 ):
     monkeypatch.setenv("GRIDBEAR_BASE_URL", "https://gb.example.com")
-    from plugins.artifacts.service import ArtifactsToolProvider
+    from plugins.artifacts.virtual_tools import ArtifactsToolProvider
 
     out = await ArtifactsToolProvider().handle_tool_call(
         "artifacts__create_artifact",
