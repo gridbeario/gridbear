@@ -34,11 +34,6 @@ services:
       - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-localhost}
       - WEBAUTHN_RP_NAME=GridBear
       - WEBAUTHN_ORIGIN=${WEBAUTHN_ORIGIN:-http://localhost:8088}
-      # Container role. In a split bot/ui deployment set this to "bot" on
-      # the bot container and "ui" on the UI container so background
-      # workers (e.g. artifacts cleanup) only run on the UI side. Leave
-      # unset for single-process deployments (bot + UI in one container).
-      # - GRIDBEAR_ROLE=bot
     expose:
       - "8000"
     ports:
