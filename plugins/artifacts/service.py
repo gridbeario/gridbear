@@ -1,4 +1,15 @@
-"""Artifacts plugin service + MCP LocalToolProvider."""
+"""Artifacts plugin service + MCP LocalToolProvider.
+
+Known v1 limitations
+--------------------
+The MCP tool handler (``ArtifactsToolProvider.handle_tool_call``) does not
+currently receive ``conversation_id`` from the MCP gateway / runner context,
+so artifacts created via the ``artifacts__create_artifact`` tool are persisted
+with ``conversation_id=NULL``. This is intentional for v1: threading the
+conversation id through the gateway kwargs is a v2 task (see TODO in
+``handle_tool_call``), and until then ``/me/artifacts`` cannot filter
+tool-created artifacts by thread.
+"""
 
 from __future__ import annotations
 
@@ -146,12 +157,35 @@ class ArtifactsToolProvider(LocalToolProvider):
     ) -> list[dict]:
         if tool_name != "artifacts__create_artifact":
             return [{"type": "text", "text": f"Unknown artifacts tool: {tool_name}"}]
+
+        # TODO(v2): thread conversation_id through from the MCP gateway
+        # (kwargs.get("conversation_id")) so /me/artifacts can filter by thread.
+        # Current v1 leaves the field NULL for tool-created artifacts.
+        agent_name = kwargs.get("agent_name")
+        oauth2_user = kwargs.get("oauth2_user")
+        if not agent_name or not oauth2_user:
+            _logger.error(
+                "artifacts__create_artifact invoked without agent/user context "
+                "(agent=%r, user=%r) — refusing",
+                agent_name,
+                oauth2_user,
+            )
+            return [
+                {
+                    "type": "text",
+                    "text": (
+                        "Error: artifact creation requires authenticated "
+                        "agent and user context."
+                    ),
+                }
+            ]
+
         try:
             result = await self._service.create(
                 title=arguments["title"],
                 html=arguments["html"],
-                agent_id=kwargs.get("agent_name") or "unknown",
-                owner_user_id=kwargs.get("oauth2_user") or "unknown",
+                agent_id=agent_name,
+                owner_user_id=oauth2_user,
                 pin=bool(arguments.get("pin", False)),
                 ttl_days=arguments.get("ttl_days"),
             )
