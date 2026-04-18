@@ -53,6 +53,7 @@ config/executor.json
 # Agent configs (contain tokens and authorized users)
 config/agents/*.yaml
 config/agents/*.yml
+config/agents/*.migrated
 !config/agents/*.example
 
 # Gmail MCP credentials and tokens
@@ -125,3 +126,6 @@ node_modules/
 package-lock.json
 ui/static/css/output.css
 config/monitoring/
+
+# Claude Code Playwright MCP session artifacts (host-side, not container)
+.playwright-mcp/

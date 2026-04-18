@@ -594,7 +594,7 @@ class ClaudeRunner(BaseRunner):
         cmd.extend(["--tools", "default"])
 
         if mcp_config and mcp_config.exists():
-            cmd.extend(["--mcp-config", str(mcp_config)])
+            cmd.extend(["--mcp-config", str(mcp_config), "--strict-mcp-config"])
 
         # Add file operation permissions
         # Permissions: file ops + MCP gateway wildcard from claude_settings.json

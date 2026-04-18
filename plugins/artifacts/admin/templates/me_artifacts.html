@@ -1,0 +1,28 @@
+{% extends "me/base.html" %}
+
+{% block title %}Your artifacts - GridBear{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Your artifacts</h1>
+<div class="space-y-3">
+  {% for a in artifacts %}
+  <div class="p-4 border rounded-lg flex justify-between items-center">
+    <div>
+      <div class="font-semibold">{{ a.title }}</div>
+      <div class="text-xs text-void-500">
+        Created by {{ a.agent_id }}
+        {% if a.size_bytes is not none %} &middot; {{ (a.size_bytes // 1024) }} KB{% endif %}
+      </div>
+      {% if a.revoked_at %}<span class="text-xs text-red-600">revoked</span>{% endif %}
+    </div>
+    {% if not a.revoked_at %}
+    <a href="/artifacts/{{ a.id }}?t={{ a.id | hmac_token }}" target="_blank"
+       class="px-3 py-1 rounded bg-blue-500 text-white text-sm">Open</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if not artifacts %}
+  <p class="text-void-400">No artifacts yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "label": "Artifacts",
+      "url": "/plugin/artifacts",
+      "icon": "fa-solid fa-cubes",
+      "section": "services",
+      "priority": 20
+    }
+  ]
+}

@@ -13,7 +13,7 @@ for dir in /app/data /app/config /app/credentials; do
 done
 
 # Ensure subdirs that plugins create on-demand exist with correct ownership
-mkdir -p /app/data/attachments /app/data/models /app/data/avatars
+mkdir -p /app/data/attachments /app/data/models /app/data/avatars /app/data/artifacts
 chown -R gridbear:gridbear /app/data
 
 exec gosu gridbear "$@"

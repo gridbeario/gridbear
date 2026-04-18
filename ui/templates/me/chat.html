@@ -2294,4 +2294,8 @@ function chatApp() {
     };
 }
 </script>
+{# Artifact preview modal (provided by the artifacts plugin).
+   Resolved via Jinja ChoiceLoader from plugins/artifacts/admin/templates/.
+   `ignore missing` keeps chat working even when the artifacts plugin is disabled. #}
+{% include "artifact_modal.html" ignore missing %}
 {% endblock %}
