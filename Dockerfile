@@ -11,6 +11,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ffmpeg \
+    gosu \
     libnss3 \
     libnspr4 \
     libatk1.0-0 \
@@ -87,13 +88,15 @@ RUN npm install --save-dev tailwindcss @tailwindcss/forms daisyui \
     && rm -rf node_modules
 
 # Create directories and set ownership
-RUN mkdir -p /app/data/attachments /app/credentials /home/gridbear/.claude /home/gridbear/.codex && \
+RUN mkdir -p /app/data/attachments /app/data/models /app/data/avatars /app/credentials /home/gridbear/.claude /home/gridbear/.codex && \
     chown -R gridbear:gridbear /app /home/gridbear
+
+# Entrypoint fixes bind-mount ownership then drops to gridbear user
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-# Switch to non-root user
-USER gridbear
-
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["python", "main.py"]
