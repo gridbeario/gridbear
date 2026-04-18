@@ -19,6 +19,9 @@ from uuid import uuid4
 
 from core.interfaces.local_tools import LocalToolProvider
 from plugins.artifacts import storage
+from plugins.artifacts.hooks import (
+    start_cleanup_worker,  # noqa: F401 — hook registration
+)
 from plugins.artifacts.models import Artifact
 from plugins.artifacts.signing import build_capability_url
 
