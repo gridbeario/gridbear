@@ -1,0 +1,177 @@
+{# Artifact preview modal - included from the webchat main template via Jinja ChoiceLoader.
+
+   Although conceptually this is a "webchat" partial, it lives under the
+   plugin's admin/templates/ directory because that path is already registered
+   with the Jinja ChoiceLoader in ui/jinja_env.py::rebuild_template_loader().
+   Keeping the file here avoids any loader changes and preserves the
+   core/ui -> plugin dependency isolation (ui never imports from plugins;
+   this is a pure template inclusion resolved at render time).
+
+   Behavior:
+   1) Scans assistant messages for /artifacts/<uuid>?t=<hex> URLs
+   2) Appends a preview card below the message with Preview + New-tab buttons
+   3) Opens the iframe (sandboxed) in the modal when Preview is clicked
+#}
+<div x-data="artifactModal()" x-show="open" x-cloak
+     @keydown.escape.window="open = false"
+     @artifact-open.window="openModal($event.detail.url, $event.detail.title)"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+  <div class="bg-white dark:bg-void-900 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col"
+       @click.stop>
+    <div class="flex items-center justify-between px-4 py-3 border-b border-void-200 dark:border-void-800">
+      <h2 class="font-semibold truncate" x-text="title"></h2>
+      <div class="flex gap-2 flex-shrink-0">
+        <a :href="url" target="_blank" rel="noopener noreferrer"
+           class="px-3 py-1 rounded bg-nordic-500 hover:bg-nordic-600 text-white text-sm">
+          <i class="fas fa-arrow-up-right-from-square mr-1"></i> Open in new tab
+        </a>
+        <button @click="open = false"
+                class="px-3 py-1 rounded bg-void-200 dark:bg-void-700 hover:bg-void-300 dark:hover:bg-void-600 text-sm">
+          <i class="fas fa-xmark"></i>
+        </button>
+      </div>
+    </div>
+    <iframe x-show="embedUrl" :src="embedUrl"
+            sandbox="allow-scripts allow-forms allow-popups"
+            referrerpolicy="no-referrer"
+            class="w-full h-[80vh] border-0 rounded-b-2xl bg-white"></iframe>
+  </div>
+</div>
+
+<script>
+function artifactModal() {
+  return {
+    open: false,
+    title: "",
+    url: "",
+    embedUrl: "",
+    openModal(url, title) {
+      this.url = url;
+      this.embedUrl = url + (url.includes('?') ? '&' : '?') + 'mode=embed';
+      this.title = title || "Artifact";
+      this.open = true;
+    }
+  };
+}
+</script>
+
+<script>
+(function() {
+  // Matches an absolute or relative artifact URL with a uuid and hex token.
+  const ARTIFACT_RE = /(https?:\/\/[^\s<"'()]+\/artifacts\/[0-9a-f-]{36}\?t=[0-9a-f]{32}|\/artifacts\/[0-9a-f-]{36}\?t=[0-9a-f]{32})/gi;
+
+  function extractUrls(text) {
+    if (!text) return [];
+    const out = new Set();
+    let match;
+    ARTIFACT_RE.lastIndex = 0;
+    while ((match = ARTIFACT_RE.exec(text)) !== null) {
+      out.add(match[1]);
+    }
+    return Array.from(out);
+  }
+
+  function buildCard(url) {
+    const card = document.createElement('div');
+    card.setAttribute('data-artifact-card', url);
+    card.className = 'mt-3 p-3 border border-void-200 dark:border-void-700 rounded-lg bg-void-50 dark:bg-void-800/40 flex justify-between items-center gap-3';
+
+    const label = document.createElement('div');
+    label.className = 'min-w-0 flex-1';
+
+    const title = document.createElement('div');
+    title.className = 'text-sm font-semibold flex items-center gap-2';
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-cube text-nordic-500';
+    const titleText = document.createElement('span');
+    titleText.textContent = 'Artifact';
+    title.appendChild(icon);
+    title.appendChild(titleText);
+
+    const subtitle = document.createElement('div');
+    subtitle.className = 'text-xs text-void-500 truncate';
+    subtitle.textContent = url;
+
+    label.appendChild(title);
+    label.appendChild(subtitle);
+
+    const actions = document.createElement('div');
+    actions.className = 'flex gap-2 flex-shrink-0';
+
+    const previewBtn = document.createElement('button');
+    previewBtn.type = 'button';
+    previewBtn.className = 'px-3 py-1.5 rounded-lg bg-nordic-500 hover:bg-nordic-600 text-white text-xs font-medium';
+    previewBtn.textContent = 'Preview';
+    previewBtn.addEventListener('click', function() {
+      window.dispatchEvent(new CustomEvent('artifact-open', {
+        detail: { url: url, title: 'Artifact' }
+      }));
+    });
+
+    const newTab = document.createElement('a');
+    newTab.className = 'px-3 py-1.5 rounded-lg bg-void-200 dark:bg-void-700 hover:bg-void-300 dark:hover:bg-void-600 text-xs font-medium';
+    newTab.textContent = 'New tab';
+    newTab.href = url;
+    newTab.target = '_blank';
+    newTab.rel = 'noopener noreferrer';
+
+    actions.appendChild(previewBtn);
+    actions.appendChild(newTab);
+    card.appendChild(label);
+    card.appendChild(actions);
+    return card;
+  }
+
+  // Given a message container (.msg-agent), find the .prose content,
+  // extract artifact URLs, and append one card per unique URL (dedup).
+  function decorate(container) {
+    if (!container || container.nodeType !== 1) return;
+    const prose = container.querySelector ? container.querySelector('.prose') : null;
+    if (!prose) return;
+    const text = prose.textContent || '';
+    const urls = extractUrls(text);
+    if (!urls.length) return;
+    for (const url of urls) {
+      const existing = container.querySelector('[data-artifact-card="' + CSS.escape(url) + '"]');
+      if (existing) continue;
+      container.appendChild(buildCard(url));
+    }
+  }
+
+  function scanAll(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    const nodes = scope.querySelectorAll ? scope.querySelectorAll('.msg-agent') : [];
+    nodes.forEach(decorate);
+    if (root && root.nodeType === 1 && root.classList && root.classList.contains('msg-agent')) {
+      decorate(root);
+    }
+  }
+
+  function observe() {
+    scanAll(document);
+    const observer = new MutationObserver(function(mutations) {
+      for (const m of mutations) {
+        m.addedNodes.forEach(function(node) {
+          if (node.nodeType !== 1) return;
+          scanAll(node);
+        });
+        if (m.type === 'characterData' || m.type === 'childList') {
+          const target = m.target && m.target.closest ? m.target.closest('.msg-agent') : null;
+          if (target) decorate(target);
+        }
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', observe);
+  } else {
+    observe();
+  }
+})();
+</script>
