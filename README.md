@@ -149,6 +149,22 @@ See `config/agents/myagent.yaml.example` for a complete reference.
 
 Plugins are discovered via `manifest.json` in each plugin directory. Enable them in `config/plugins.json`.
 
+### When a restart is required
+
+The "hot-reload" capability advertised above reloads the code of a plugin
+that is **already enabled at boot** — useful while iterating on a plugin's
+admin page, config, secrets, or skills. Two operations still require a
+container restart (`docker compose restart gridbear`):
+
+- **Enabling or disabling a plugin** via `/plugins/` or `config/plugins.json`.
+  This is especially relevant for **runners** (Claude, OpenAI, Gemini,
+  Ollama) — enabling a new runner plugin writes the registry entry but
+  the runner class only joins the plugin manager at the next boot; agents
+  configured to use it will fall back to the default runner until restart.
+  The admin UI already shows a "Restart to activate" banner after a toggle.
+- **Adding a new plugin path** (`GRIDBEAR_PLUGIN_PATHS` env var or "Add
+  plugin path" action). Discovery runs once at boot.
+
 ## Development
 
 ```bash
