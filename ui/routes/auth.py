@@ -155,7 +155,10 @@ async def login_page(request: Request):
 
     user = get_current_user(request)
     if user:
-        # If already logged in and OAuth2 authorize pending, redirect there
+        # If already logged in and a redirect is pending (artifact, OAuth2), follow it
+        post_login = request.session.pop("post_login_redirect", None)
+        if post_login:
+            return RedirectResponse(url=post_login, status_code=303)
         oauth2_return = request.session.pop("oauth2_return_url", None)
         if oauth2_return:
             return RedirectResponse(url=oauth2_return, status_code=303)
@@ -295,9 +298,12 @@ async def login(
         success=True,
     )
 
-    # Check for pending OAuth2 authorization redirect
+    # Check for pending redirect (artifact link, OAuth2 authorize, etc.)
+    post_login = request.session.pop("post_login_redirect", None)
     oauth2_return = request.session.pop("oauth2_return_url", None)
-    if oauth2_return:
+    if post_login:
+        redirect_to = post_login
+    elif oauth2_return:
         redirect_to = oauth2_return
     elif user.get("is_superadmin"):
         redirect_to = "/"
@@ -356,7 +362,8 @@ async def verify_2fa(
     if encrypted_secret:
         secret = totp_manager.decrypt_secret(encrypted_secret, user_id)
         if secret and totp_manager.verify_code(secret, code):
-            # Get pending OAuth2 redirect before clearing session
+            # Get pending redirects before clearing session
+            post_login = request.session.get("post_login_redirect")
             oauth2_return = request.session.get("oauth2_return_url")
 
             request.session.pop("pending_2fa_user_id", None)
@@ -372,7 +379,10 @@ async def verify_2fa(
             )
 
             # Redirect based on role
-            if oauth2_return:
+            if post_login:
+                redirect_to = post_login
+                request.session.pop("post_login_redirect", None)
+            elif oauth2_return:
                 redirect_to = oauth2_return
                 request.session.pop("oauth2_return_url", None)
             elif user.get("is_superadmin"):
@@ -385,6 +395,7 @@ async def verify_2fa(
             return response
 
     if recovery_manager.verify_code(user_id, code):
+        post_login = request.session.get("post_login_redirect")
         oauth2_return = request.session.get("oauth2_return_url")
 
         request.session.pop("pending_2fa_user_id", None)
@@ -401,7 +412,10 @@ async def verify_2fa(
             details=f"Recovery code used, {remaining} remaining",
         )
 
-        if oauth2_return:
+        if post_login:
+            redirect_to = post_login
+            request.session.pop("post_login_redirect", None)
+        elif oauth2_return:
             redirect_to = oauth2_return
             request.session.pop("oauth2_return_url", None)
         elif user.get("is_superadmin"):
@@ -590,8 +604,11 @@ async def verify_passkey(request: Request):
         success=True,
     )
 
+    post_login = request.session.pop("post_login_redirect", None)
     oauth2_return = request.session.pop("oauth2_return_url", None)
-    if oauth2_return:
+    if post_login:
+        redirect_to = post_login
+    elif oauth2_return:
         redirect_to = oauth2_return
     elif user.get("is_superadmin"):
         redirect_to = "/"
