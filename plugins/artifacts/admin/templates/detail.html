@@ -1,0 +1,58 @@
+{% extends "plugins/plugin_subpage.html" %}
+
+{% block subpage_content %}
+<div class="space-y-4">
+  <div class="flex items-center gap-3">
+    <h2 class="text-xl font-semibold">{{ artifact.title }}</h2>
+    {% if artifact.revoked_at %}
+      <span class="px-2 py-0.5 rounded text-xs bg-red-100 text-red-800">revoked</span>
+    {% elif artifact.pinned %}
+      <span class="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">pinned</span>
+    {% endif %}
+  </div>
+
+  <div class="text-sm text-void-500 space-y-1">
+    <div>Agent: <span class="font-mono">{{ artifact.agent_id }}</span></div>
+    <div>Owner: <span class="font-mono">{{ artifact.owner_user_id }}</span></div>
+    <div>Size: {{ (artifact.size_bytes // 1024) }} KB</div>
+    <div>Created: {{ artifact.created_at }}</div>
+    <div>Expires: {% if artifact.pinned %}∞{% else %}{{ artifact.expires_at }}{% endif %}</div>
+  </div>
+
+  <div class="bg-void-50 dark:bg-void-800/50 p-3 rounded">
+    <label class="text-xs text-void-500">Capability URL</label>
+    <input type="text" readonly value="{{ artifact.capability_url }}"
+           class="w-full bg-white dark:bg-void-900 border rounded px-3 py-1 font-mono text-xs">
+  </div>
+
+  <iframe src="{{ artifact.capability_url }}&amp;mode=embed"
+          sandbox="allow-scripts"
+          class="w-full h-96 border rounded"></iframe>
+
+  <div class="flex gap-2">
+    <form method="post" action="/plugin/artifacts/{{ artifact.id }}/pin">
+      {% include "partials/csrf_field.html" %}
+      <input type="hidden" name="pinned" value="{{ 'false' if artifact.pinned else 'true' }}">
+      <button class="px-3 py-1 rounded bg-blue-500 text-white text-sm">
+        {{ 'Unpin' if artifact.pinned else 'Pin' }}
+      </button>
+    </form>
+    {% if artifact.revoked_at %}
+    <form method="post" action="/plugin/artifacts/{{ artifact.id }}/unrevoke">
+      {% include "partials/csrf_field.html" %}
+      <button class="px-3 py-1 rounded bg-yellow-500 text-white text-sm">Unrevoke</button>
+    </form>
+    {% else %}
+    <form method="post" action="/plugin/artifacts/{{ artifact.id }}/revoke">
+      {% include "partials/csrf_field.html" %}
+      <button class="px-3 py-1 rounded bg-yellow-500 text-white text-sm">Revoke</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/plugin/artifacts/{{ artifact.id }}/delete"
+          onsubmit="return confirm('Delete this artifact permanently?')">
+      {% include "partials/csrf_field.html" %}
+      <button class="px-3 py-1 rounded bg-red-500 text-white text-sm">Delete</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
