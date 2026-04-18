@@ -247,7 +247,7 @@ class ClaudeProcessPool:
         ]
 
         if mcp_config_path:
-            cmd.extend(["--mcp-config", mcp_config_path])
+            cmd.extend(["--mcp-config", mcp_config_path, "--strict-mcp-config"])
 
         # Add permissions from settings (includes MCP gateway wildcard)
         all_perms = []
