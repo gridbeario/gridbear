@@ -88,7 +88,7 @@ RUN npm install --save-dev tailwindcss @tailwindcss/forms daisyui \
     && rm -rf node_modules
 
 # Create directories and set ownership
-RUN mkdir -p /app/data/attachments /app/data/models /app/data/avatars /app/credentials /home/gridbear/.claude /home/gridbear/.codex && \
+RUN mkdir -p /app/data/attachments /app/data/models /app/data/avatars /app/data/artifacts /app/credentials /home/gridbear/.claude /home/gridbear/.codex && \
     chown -R gridbear:gridbear /app /home/gridbear
 
 # Entrypoint fixes bind-mount ownership then drops to gridbear user

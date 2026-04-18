@@ -51,6 +51,15 @@ The hook system uses a different architecture and API design.
 
 Cheshire Cat AI is licensed under GPLv3.
 
+### Anthropic Claude Artifacts
+
+The single-file HTML artifact pattern — self-contained HTML/CSS/JS with
+embedded data, rendered in a sandboxed iframe — is modelled after the
+[Artifacts feature](https://www.anthropic.com/news/artifacts) in Anthropic's
+Claude consumer UI. GridBear's implementation is entirely original code;
+the pattern is architectural inspiration. Anthropic's product is
+proprietary; no code was copied.
+
 ### Memory System Terminology
 
 The memory system uses standard cognitive science terminology:
