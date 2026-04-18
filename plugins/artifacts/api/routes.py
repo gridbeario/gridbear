@@ -2,6 +2,12 @@
 
 Mounted on the UI FastAPI app at prefix /artifacts. These endpoints do not
 require admin login — access is gated by the HMAC token (capability model).
+
+Action endpoints (pin/revoke/unrevoke) live on the public router because the
+plugin manifest sets `public_api: true`. They therefore share the capability
+URL gating model: the client must supply `t=<hmac>` as a query parameter.
+The admin UI's Task 9 routes remain authed via `require_login` and are not
+affected by this module.
 """
 
 from __future__ import annotations
@@ -140,6 +146,8 @@ async def artifact_meta(uuid: str):
     if not rows:
         return JSONResponse({"error": "not_found"}, status_code=404)
     row = rows[0]
+    if row.get("revoked_at") is not None:
+        return JSONResponse({"error": "revoked"}, status_code=410)
     return JSONResponse(
         {
             "title": row["title"],
@@ -155,7 +163,13 @@ class PinBody(BaseModel):
 
 
 @router.post("/{uuid}/pin")
-async def action_pin(uuid: str, body: PinBody):
+async def action_pin(
+    uuid: str,
+    body: PinBody,
+    t: str = Query(..., min_length=32, max_length=64),
+):
+    if not verify_signature(uuid, t):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     from plugins.artifacts.service import ArtifactsService
 
     await ArtifactsService().pin(uuid, pinned=body.pinned)
@@ -163,7 +177,12 @@ async def action_pin(uuid: str, body: PinBody):
 
 
 @router.post("/{uuid}/revoke")
-async def action_revoke(uuid: str):
+async def action_revoke(
+    uuid: str,
+    t: str = Query(..., min_length=32, max_length=64),
+):
+    if not verify_signature(uuid, t):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     from plugins.artifacts.service import ArtifactsService
 
     await ArtifactsService().revoke(uuid)
@@ -171,7 +190,12 @@ async def action_revoke(uuid: str):
 
 
 @router.post("/{uuid}/unrevoke")
-async def action_unrevoke(uuid: str):
+async def action_unrevoke(
+    uuid: str,
+    t: str = Query(..., min_length=32, max_length=64),
+):
+    if not verify_signature(uuid, t):
+        return JSONResponse({"error": "forbidden"}, status_code=403)
     from plugins.artifacts.service import ArtifactsService
 
     await ArtifactsService().unrevoke(uuid)

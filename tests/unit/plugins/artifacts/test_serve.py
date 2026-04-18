@@ -130,3 +130,48 @@ async def test_file_missing_returns_404(client):
     delete_artifact(uid)
     resp = client.get(f"/artifacts/{uid}", params={"t": token, "mode": "embed"})
     assert resp.status_code == 404
+
+
+async def test_meta_revoked_returns_410(client):
+    from datetime import UTC, datetime
+
+    from plugins.artifacts.models import Artifact
+
+    r = await _create_valid()
+    uid = r["artifact_id"]
+    await Artifact.write(uid, revoked_at=datetime.now(UTC))
+    resp = client.get(f"/artifacts/{uid}/meta")
+    assert resp.status_code == 410
+
+
+async def test_pin_without_token_returns_403(client):
+    r = await _create_valid()
+    resp = client.post(f"/artifacts/{r['artifact_id']}/pin", json={"pinned": True})
+    # Missing `t` → 422 from FastAPI validator OR we want 403; 422 is acceptable since token is required by schema
+    assert resp.status_code in (400, 403, 422)
+
+
+async def test_pin_with_invalid_token_returns_403(client):
+    r = await _create_valid()
+    resp = client.post(
+        f"/artifacts/{r['artifact_id']}/pin",
+        json={"pinned": True},
+        params={"t": "deadbeef" * 4},
+    )
+    assert resp.status_code == 403
+
+
+async def test_pin_with_valid_token_succeeds(client):
+    from plugins.artifacts.models import Artifact
+
+    r = await _create_valid()
+    uid = r["artifact_id"]
+    token = r["url"].split("t=")[1]
+    resp = client.post(
+        f"/artifacts/{uid}/pin",
+        json={"pinned": True},
+        params={"t": token},
+    )
+    assert resp.status_code == 200
+    rows = await Artifact.search([("id", "=", uid)])
+    assert rows[0]["pinned"] is True
