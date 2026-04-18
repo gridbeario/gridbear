@@ -1,0 +1,41 @@
+{
+  "name": "artifacts",
+  "version": "0.1.0",
+  "description": "Standalone HTML artifacts produced by agents, served via signed capability URLs.",
+  "type": "service",
+  "entry_point": "service.py",
+  "class_name": "ArtifactsService",
+  "provides": "artifacts",
+  "public_api": true,
+  "public_api_prefix": "/artifacts",
+  "dependencies": {
+    "required": [],
+    "optional": []
+  },
+  "config_schema": {
+    "default_ttl_days": {
+      "type": "integer",
+      "default": 30,
+      "description": "Default TTL in days applied to new artifacts when ttl_days not specified"
+    },
+    "max_html_bytes": {
+      "type": "integer",
+      "default": 2097152,
+      "description": "Hard cap on artifact HTML size (2 MB)"
+    },
+    "cleanup_interval_hours": {
+      "type": "integer",
+      "default": 6,
+      "description": "How often the cleanup worker prunes expired non-pinned artifacts"
+    },
+    "csp_cdns": {
+      "type": "array",
+      "default": ["https://esm.sh", "https://unpkg.com", "https://cdn.jsdelivr.net"],
+      "description": "CDNs whitelisted in the artifact CSP"
+    }
+  },
+  "ui": {
+    "display_name": "Artifacts",
+    "icon": "fa-solid fa-cubes"
+  }
+}
