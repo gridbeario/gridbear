@@ -35,8 +35,16 @@ def verify_signature(uuid_str: str, token: str) -> bool:
     return _hmac.compare_digest(expected, token)
 
 
-def build_capability_url(uuid_str: str) -> str:
-    """Build a full /artifacts/<uuid>?t=<token> URL using GRIDBEAR_BASE_URL."""
+def build_capability_url(uuid_str: str, share_token: str | None = None) -> str:
+    """Build a full /artifacts/<uuid>?t=<hmac>[&s=<share>] URL.
+
+    ``share_token`` is the per-artifact random token stored in the DB — when
+    included, anyone with this URL can view without logging in. Revoking the
+    column on the row kills the link.
+    """
     base = os.environ.get("GRIDBEAR_BASE_URL", "").rstrip("/")
     token = sign_uuid(uuid_str)
-    return f"{base}/artifacts/{uuid_str}?t={token}"
+    url = f"{base}/artifacts/{uuid_str}?t={token}"
+    if share_token:
+        url += f"&s={share_token}"
+    return url

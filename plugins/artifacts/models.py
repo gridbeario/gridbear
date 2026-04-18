@@ -31,6 +31,7 @@ class Artifact(Model):
     size_bytes = fields.Integer(required=True)
     content_hash = fields.Text(required=True)
     pinned = fields.Boolean(default=False)
+    share_token = fields.Text()
     expires_at = fields.DateTime(required=True, index=True)
     revoked_at = fields.DateTime()
     created_at = fields.DateTime(auto_now_add=True)

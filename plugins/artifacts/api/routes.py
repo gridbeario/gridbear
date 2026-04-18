@@ -16,12 +16,51 @@ import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from pydantic import BaseModel
 
 from plugins.artifacts import storage
 from plugins.artifacts.models import Artifact
 from plugins.artifacts.signing import verify_signature
+from ui.auth.session import get_current_user
+
+_NOINDEX_HEADERS = {"X-Robots-Tag": "noindex, nofollow, noarchive"}
+
+
+def _check_access(row: dict, request: Request, share: str | None) -> Response | None:
+    """Gate artifact access.
+
+    Allow if: valid ``?s=<token>`` matches share_token, OR authenticated
+    user is the owner / superadmin. Otherwise redirect to login (so external
+    clickers who lost the share token are prompted to log in).
+    Returns an error/redirect response if denied, None if allowed.
+    """
+    stored_token = row.get("share_token")
+    if share and stored_token and _hmac_compare(share, stored_token):
+        return None
+    user = get_current_user(request)
+    if not user:
+        request.session["post_login_redirect"] = str(request.url)
+        return RedirectResponse(url="/auth/login", status_code=303)
+    if user.get("is_superadmin"):
+        return None
+    if user.get("username") != row.get("owner_user_id"):
+        return PlainTextResponse("Forbidden", status_code=403, headers=_NOINDEX_HEADERS)
+    return None
+
+
+def _hmac_compare(a: str, b: str) -> bool:
+    """Constant-time comparison to avoid timing oracles on share tokens."""
+    import hmac as _h
+
+    return _h.compare_digest(a.encode(), b.encode())
+
 
 _logger = logging.getLogger(__name__)
 
@@ -63,13 +102,17 @@ def _html_escape(s: str) -> str:
     )
 
 
-def _wrapper_html(*, title: str, uid: str, token: str, size_bytes: int) -> str:
+def _wrapper_html(
+    *, title: str, uid: str, token: str, size_bytes: int, share: str | None
+) -> str:
     size_kb = size_bytes // 1024 or 1
     safe_title = _html_escape(title)
+    share_qs = f"&amp;s={share}" if share else ""
     return f"""<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow, noarchive">
   <title>{safe_title}</title>
   <meta property="og:title" content="{safe_title}">
   <meta property="og:description" content="GridBear artifact — {size_kb}KB">
@@ -83,7 +126,7 @@ def _wrapper_html(*, title: str, uid: str, token: str, size_bytes: int) -> str:
 </head>
 <body>
   <header class="top-bar"><h1>{safe_title}</h1></header>
-  <iframe src="/artifacts/{uid}?t={token}&amp;mode=embed"
+  <iframe src="/artifacts/{uid}?t={token}{share_qs}&amp;mode=embed"
           sandbox="allow-scripts" allow="clipboard-write"></iframe>
 </body>
 </html>"""
@@ -94,27 +137,42 @@ async def serve_artifact(
     request: Request,
     uuid: str,
     t: str = Query(..., min_length=32, max_length=64),
+    s: str | None = Query(None, min_length=16, max_length=64),
     mode: str | None = Query(None),
 ):
     if not verify_signature(uuid, t):
-        return PlainTextResponse("Forbidden", status_code=403)
+        return PlainTextResponse("Forbidden", status_code=403, headers=_NOINDEX_HEADERS)
 
     rows = await Artifact.search([("id", "=", uuid)])
     if not rows:
-        return PlainTextResponse("Not Found", status_code=404)
+        return PlainTextResponse("Not Found", status_code=404, headers=_NOINDEX_HEADERS)
 
     row = rows[0]
     if row.get("revoked_at") is not None:
-        return PlainTextResponse("This artifact has been revoked.", status_code=410)
+        return PlainTextResponse(
+            "This artifact has been revoked.",
+            status_code=410,
+            headers=_NOINDEX_HEADERS,
+        )
 
     expires_at = row["expires_at"]
     if expires_at and expires_at < datetime.now(UTC) and not row["pinned"]:
-        return PlainTextResponse("This artifact has expired.", status_code=410)
+        return PlainTextResponse(
+            "This artifact has expired.",
+            status_code=410,
+            headers=_NOINDEX_HEADERS,
+        )
+
+    denied = _check_access(row, request, s)
+    if denied is not None:
+        return denied
 
     if mode == "embed":
         if not storage.exists(uuid):
             _logger.warning("Artifact row %s exists but file missing", uuid)
-            return PlainTextResponse("Not Found", status_code=404)
+            return PlainTextResponse(
+                "Not Found", status_code=404, headers=_NOINDEX_HEADERS
+            )
         html = storage.read_artifact(uuid)
         return HTMLResponse(
             content=html,
@@ -123,6 +181,8 @@ async def serve_artifact(
                 "X-Frame-Options": "SAMEORIGIN",
                 "X-Content-Type-Options": "nosniff",
                 "Referrer-Policy": "no-referrer",
+                "Cache-Control": "private, no-store, max-age=0",
+                **_NOINDEX_HEADERS,
             },
         )
 
@@ -132,10 +192,13 @@ async def serve_artifact(
             uid=uuid,
             token=t,
             size_bytes=row["size_bytes"],
+            share=s,
         ),
         headers={
             "Content-Security-Policy": _wrapper_csp(),
             "X-Frame-Options": "SAMEORIGIN",
+            "Cache-Control": "private, no-store, max-age=0",
+            **_NOINDEX_HEADERS,
         },
     )
 

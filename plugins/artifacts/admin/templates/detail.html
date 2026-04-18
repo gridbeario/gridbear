@@ -1,9 +1,23 @@
-{% extends "plugins/plugin_subpage.html" %}
+{% extends "base.html" %}
 
-{% block subpage_content %}
-<div class="space-y-4">
-  <div class="flex items-center gap-3">
-    <h2 class="text-xl font-semibold">{{ artifact.title }}</h2>
+{% block title %}{{ artifact.title }} - Artifacts - GridBear Admin{% endblock %}
+{% block page_title %}Artifact Detail{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <a href="/plugin/artifacts/" class="text-sm text-blue-600 hover:underline">
+    <i class="fa-solid fa-arrow-left"></i> Back to list
+  </a>
+</div>
+
+<div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 p-5 space-y-4">
+  <div class="flex items-center gap-3 flex-wrap">
+    <h2 class="text-xl font-semibold text-void-900 dark:text-white">{{ artifact.title }}</h2>
+    {% if artifact.share_token %}
+      <span class="px-2 py-0.5 rounded text-xs bg-orange-100 text-orange-800"><i class="fa-solid fa-link"></i> share active</span>
+    {% else %}
+      <span class="px-2 py-0.5 rounded text-xs bg-void-200 text-void-800"><i class="fa-solid fa-link-slash"></i> share revoked</span>
+    {% endif %}
     {% if artifact.revoked_at %}
       <span class="px-2 py-0.5 rounded text-xs bg-red-100 text-red-800">revoked</span>
     {% elif artifact.pinned %}
@@ -11,7 +25,7 @@
     {% endif %}
   </div>
 
-  <div class="text-sm text-void-500 space-y-1">
+  <div class="text-sm text-void-600 dark:text-void-400 space-y-1">
     <div>Agent: <span class="font-mono">{{ artifact.agent_id }}</span></div>
     <div>Owner: <span class="font-mono">{{ artifact.owner_user_id }}</span></div>
     <div>Size: {{ (artifact.size_bytes // 1024) }} KB</div>
@@ -20,16 +34,67 @@
   </div>
 
   <div class="bg-void-50 dark:bg-void-800/50 p-3 rounded">
-    <label class="text-xs text-void-500">Capability URL</label>
-    <input type="text" readonly value="{{ artifact.capability_url }}"
-           class="w-full bg-white dark:bg-void-900 border rounded px-3 py-1 font-mono text-xs">
+    <label class="text-xs text-void-500">
+      {% if artifact.share_token %}Shareable URL (anyone with this link can view){% else %}URL (owner/admin only — share token revoked){% endif %}
+    </label>
+    <div class="flex gap-2 items-center">
+      <input type="text" readonly value="{{ artifact.capability_url }}"
+             id="share-url-input"
+             class="flex-1 bg-white dark:bg-void-900 border rounded px-3 py-1 font-mono text-xs">
+      <button type="button"
+              onclick="copyShareUrl(this)"
+              class="px-3 py-1 rounded border text-sm whitespace-nowrap hover:bg-void-100 dark:hover:bg-void-700">
+        <i class="fa-regular fa-copy"></i>
+        <span data-label>Copy</span>
+      </button>
+    </div>
   </div>
+  <script>
+    function copyShareUrl(btn) {
+      const input = document.getElementById('share-url-input');
+      const label = btn.querySelector('[data-label]');
+      navigator.clipboard.writeText(input.value).then(() => {
+        const orig = label.textContent;
+        label.textContent = 'Copied';
+        setTimeout(() => { label.textContent = orig; }, 1500);
+      }).catch(() => {
+        // Fallback for older browsers / non-HTTPS contexts
+        input.select();
+        document.execCommand('copy');
+        label.textContent = 'Copied';
+        setTimeout(() => { label.textContent = 'Copy'; }, 1500);
+      });
+    }
+  </script>
 
   <iframe src="{{ artifact.capability_url }}&amp;mode=embed"
           sandbox="allow-scripts"
           class="w-full h-96 border rounded"></iframe>
 
-  <div class="flex gap-2">
+  <div class="flex flex-wrap gap-2 pt-2 border-t border-void-200 dark:border-void-800">
+    {% if artifact.share_token %}
+    <form method="post" action="/plugin/artifacts/{{ artifact.id }}/share/regenerate"
+          onsubmit="return confirm('Regenerate share link? The previous link will stop working.')">
+      {% include "partials/csrf_field.html" %}
+      <button class="px-3 py-1 rounded bg-orange-500 text-white text-sm">
+        <i class="fa-solid fa-rotate"></i> Regenerate share link
+      </button>
+    </form>
+    <form method="post" action="/plugin/artifacts/{{ artifact.id }}/share/revoke"
+          onsubmit="return confirm('Revoke share link? External users will lose access.')">
+      {% include "partials/csrf_field.html" %}
+      <button class="px-3 py-1 rounded bg-void-600 text-white text-sm">
+        <i class="fa-solid fa-link-slash"></i> Revoke share link
+      </button>
+    </form>
+    {% else %}
+    <form method="post" action="/plugin/artifacts/{{ artifact.id }}/share/regenerate">
+      {% include "partials/csrf_field.html" %}
+      <button class="px-3 py-1 rounded bg-orange-500 text-white text-sm">
+        <i class="fa-solid fa-link"></i> Generate share link
+      </button>
+    </form>
+    {% endif %}
     <form method="post" action="/plugin/artifacts/{{ artifact.id }}/pin">
       {% include "partials/csrf_field.html" %}
       <input type="hidden" name="pinned" value="{{ 'false' if artifact.pinned else 'true' }}">

@@ -22,10 +22,11 @@ _TOOLS = [
         "name": "artifacts__create_artifact",
         "description": (
             "Create a standalone HTML artifact (dashboard, chart, data viewer). "
-            "Returns a public URL the user can click. Keep HTML self-contained: "
-            "inline CSS and JS. External libraries only from esm.sh / unpkg / "
-            "cdn.jsdelivr.net. Embed data directly; the CSP blocks runtime fetch. "
-            "Pass pin=true to exempt the 30-day TTL."
+            "Returns a shareable URL — anyone with the link can view. The admin "
+            "can revoke or regenerate the share link later if needed. Keep HTML "
+            "self-contained: inline CSS and JS. External libraries only from "
+            "esm.sh / unpkg / cdn.jsdelivr.net. Embed data directly; the CSP "
+            "blocks runtime fetch. Pass pin=true to exempt the 30-day TTL."
         ),
         "inputSchema": {
             "type": "object",

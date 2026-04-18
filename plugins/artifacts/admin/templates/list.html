@@ -1,23 +1,36 @@
-{% extends "plugins/plugin_base.html" %}
+{% extends "base.html" %}
 
-{% block plugin_content_after %}
+{% block title %}Artifacts - GridBear Admin{% endblock %}
+{% block page_title %}Artifacts{% endblock %}
+
+{% block content %}
 <div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
   <div class="p-5 border-b border-void-200 dark:border-void-800">
-    <h3 class="font-semibold text-void-900 dark:text-white">Artifacts</h3>
+    <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
+      <i class="fa-solid fa-cubes"></i> Artifacts
+    </h3>
     <p class="text-sm text-void-500 dark:text-void-400">{{ artifacts|length }} records</p>
   </div>
-  <form method="get" class="p-4 flex gap-2 border-b border-void-200 dark:border-void-800">
+  <form method="get" class="p-4 flex flex-wrap gap-2 border-b border-void-200 dark:border-void-800">
+    <input name="q" placeholder="search title…" value="{{ filter_q }}"
+           class="border rounded px-3 py-1 text-sm flex-1 min-w-[160px] bg-white dark:bg-void-800">
     <input name="agent" placeholder="agent" value="{{ filter_agent }}"
-           class="border rounded px-3 py-1 text-sm">
+           class="border rounded px-3 py-1 text-sm w-32 bg-white dark:bg-void-800">
     <input name="owner" placeholder="owner" value="{{ filter_owner }}"
-           class="border rounded px-3 py-1 text-sm">
-    <select name="status" class="border rounded px-3 py-1 text-sm">
-      <option value="">any</option>
+           class="border rounded px-3 py-1 text-sm w-32 bg-white dark:bg-void-800">
+    <select name="status" class="border rounded px-3 py-1 text-sm bg-white dark:bg-void-800">
+      <option value="">any status</option>
       <option value="active" {% if filter_status == "active" %}selected{% endif %}>active</option>
       <option value="expired" {% if filter_status == "expired" %}selected{% endif %}>expired</option>
       <option value="revoked" {% if filter_status == "revoked" %}selected{% endif %}>revoked</option>
     </select>
+    <select name="share" class="border rounded px-3 py-1 text-sm bg-white dark:bg-void-800">
+      <option value="">any share</option>
+      <option value="active" {% if filter_share == "active" %}selected{% endif %}>share active</option>
+      <option value="revoked" {% if filter_share == "revoked" %}selected{% endif %}>share revoked</option>
+    </select>
     <button type="submit" class="px-3 py-1 rounded bg-blue-500 text-white text-sm">Filter</button>
+    <a href="/plugin/artifacts/" class="px-3 py-1 rounded border text-sm">Reset</a>
   </form>
   <table class="w-full text-sm">
     <thead class="bg-void-100 dark:bg-void-800/50">
@@ -25,6 +38,7 @@
         <th class="text-left px-4 py-2">Title</th>
         <th class="text-left px-4 py-2">Agent</th>
         <th class="text-left px-4 py-2">Owner</th>
+        <th class="text-left px-4 py-2">Share</th>
         <th class="text-left px-4 py-2">Size</th>
         <th class="text-left px-4 py-2">Status</th>
         <th class="text-left px-4 py-2">Expires</th>
@@ -38,9 +52,16 @@
         </td>
         <td class="px-4 py-2 font-mono text-xs">{{ a.agent_id }}</td>
         <td class="px-4 py-2 font-mono text-xs">{{ a.owner_user_id }}</td>
-        <td class="px-4 py-2">{{ (a.size_bytes // 1024) }} KB</td>
         <td class="px-4 py-2">
-          <span class="px-2 py-0.5 rounded text-xs
+          {% if a.share_token %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-orange-100 text-orange-800 whitespace-nowrap"><i class="fa-solid fa-link"></i> active</span>
+          {% else %}
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-void-200 text-void-800 whitespace-nowrap"><i class="fa-solid fa-link-slash"></i> revoked</span>
+          {% endif %}
+        </td>
+        <td class="px-4 py-2 whitespace-nowrap">{{ (a.size_bytes // 1024) }} KB</td>
+        <td class="px-4 py-2">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs whitespace-nowrap
             {% if a._status == 'active' %}bg-green-100 text-green-800
             {% elif a._status == 'expired' %}bg-yellow-100 text-yellow-800
             {% else %}bg-red-100 text-red-800{% endif %}">
@@ -54,7 +75,7 @@
       </tr>
       {% endfor %}
       {% if not artifacts %}
-      <tr><td colspan="6" class="px-4 py-8 text-center text-void-400">No artifacts.</td></tr>
+      <tr><td colspan="7" class="px-4 py-8 text-center text-void-400">No artifacts.</td></tr>
       {% endif %}
     </tbody>
   </table>

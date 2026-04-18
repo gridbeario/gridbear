@@ -14,6 +14,7 @@ kwargs is a v2 task (see TODO in ``handle_tool_call``), and until then
 from __future__ import annotations
 
 import logging
+import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
@@ -43,6 +44,13 @@ def _load_config() -> dict:
 class ArtifactsService:
     """Facade for artifact creation, retrieval, and lifecycle actions."""
 
+    def __init__(self, config: dict | None = None) -> None:
+        self.config = config or {}
+
+    async def initialize(self) -> None:
+        """No-op initializer — service is stateless."""
+        return None
+
     async def create(
         self,
         *,
@@ -66,6 +74,7 @@ class ArtifactsService:
         content_hash, size_bytes = storage.compute_hash_and_size(html)
 
         artifact_id = str(uuid4())
+        share_token = secrets.token_urlsafe(24)
         now = datetime.now(UTC)
         expires_at = now + timedelta(days=ttl)
 
@@ -81,6 +90,7 @@ class ArtifactsService:
                 size_bytes=size_bytes,
                 content_hash=content_hash,
                 pinned=pin,
+                share_token=share_token,
                 expires_at=expires_at,
             )
         except Exception:
@@ -89,10 +99,20 @@ class ArtifactsService:
 
         return {
             "artifact_id": artifact_id,
-            "url": build_capability_url(artifact_id),
+            "url": build_capability_url(artifact_id, share_token=share_token),
             "expires_at": expires_at.isoformat(),
             "title": title,
         }
+
+    async def regenerate_share_token(self, artifact_id: str) -> str:
+        """Generate a new share token; old share links stop working."""
+        new_token = secrets.token_urlsafe(24)
+        await Artifact.write(artifact_id, share_token=new_token)
+        return new_token
+
+    async def revoke_share_token(self, artifact_id: str) -> None:
+        """Clear share token — only owner/admin can view after this."""
+        await Artifact.write(artifact_id, share_token=None)
 
     async def pin(self, artifact_id: str, *, pinned: bool) -> None:
         if pinned:

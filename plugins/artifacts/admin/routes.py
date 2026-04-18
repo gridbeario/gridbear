@@ -30,9 +30,11 @@ def _get_plugin_metadata() -> dict:
 async def list_artifacts(
     request: Request,
     _=Depends(require_login),
+    q: str | None = None,
     agent: str | None = None,
     owner: str | None = None,
     status: str | None = None,
+    share: str | None = None,
 ):
     from plugins.artifacts.models import Artifact
 
@@ -41,6 +43,12 @@ async def list_artifacts(
         domain.append(("agent_id", "=", agent))
     if owner:
         domain.append(("owner_user_id", "=", owner))
+    if share == "active":
+        domain.append(("share_token", "!=", None))
+    elif share == "revoked":
+        domain.append(("share_token", "=", None))
+    if q:
+        domain.append(("title", "ilike", f"%{q}%"))
     rows = await Artifact.search(domain, order="created_at DESC", limit=200)
 
     now = datetime.now(UTC)
@@ -64,9 +72,11 @@ async def list_artifacts(
             request,
             PLUGIN_DIR,
             artifacts=enriched,
+            filter_q=q or "",
             filter_agent=agent or "",
             filter_owner=owner or "",
             filter_status=status or "",
+            filter_share=share or "",
         ),
     )
 
@@ -80,7 +90,9 @@ async def artifact_detail(request: Request, uuid: str, _=Depends(require_login))
     if not rows:
         return HTMLResponse("Not Found", status_code=404)
     row = dict(rows[0])
-    row["capability_url"] = build_capability_url(uuid)
+    row["capability_url"] = build_capability_url(
+        uuid, share_token=row.get("share_token")
+    )
     return templates.TemplateResponse(
         "detail.html",
         get_plugin_template_context(request, PLUGIN_DIR, artifact=row),
@@ -118,3 +130,19 @@ async def admin_delete(uuid: str, _=Depends(require_login)):
 
     await ArtifactsService().hard_delete(uuid)
     return RedirectResponse("/plugin/artifacts/", status_code=303)
+
+
+@router.post("/{uuid}/share/regenerate")
+async def admin_regenerate_share(uuid: str, _=Depends(require_login)):
+    from plugins.artifacts.service import ArtifactsService
+
+    await ArtifactsService().regenerate_share_token(uuid)
+    return RedirectResponse(f"/plugin/artifacts/{uuid}", status_code=303)
+
+
+@router.post("/{uuid}/share/revoke")
+async def admin_revoke_share(uuid: str, _=Depends(require_login)):
+    from plugins.artifacts.service import ArtifactsService
+
+    await ArtifactsService().revoke_share_token(uuid)
+    return RedirectResponse(f"/plugin/artifacts/{uuid}", status_code=303)
