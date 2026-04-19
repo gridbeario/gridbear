@@ -14,13 +14,15 @@ router = APIRouter()
 async def permissions_page(request: Request, _: bool = Depends(require_login)):
     from ui.auth.models import AdminUser
     from ui.utils.channels import get_available_channels, get_channel_ui_map
+    from ui.utils.mcp_servers import get_available_mcp_servers
 
     config = ConfigManager()
     permissions = config.get_all_user_permissions()
-    available_servers = config.get_available_mcp_servers()
+    available_servers = get_available_mcp_servers()
 
-    # Fallback: collect server names from existing permissions when
-    # plugin_manager is unavailable (admin runs in a separate container)
+    # Last-chance fallback: union with any server names referenced by
+    # existing user/group permissions (covers older installs whose plugin
+    # registry predates the MCP plugin registration).
     if not available_servers:
         seen = set()
         for servers in permissions.values():
