@@ -145,6 +145,7 @@
                         <i class="fas fa-wrench w-5 text-center flex-shrink-0"></i>
                         <span class="sidebar-label">{{ _("MCP Tools") }}</span>
                     </a>
+                    {% if plugin_enabled('workflow') %}
                     <a href="/me/workflows"
                        class="flex items-center rounded-xl text-sm font-medium transition-all hover:bg-void-100 dark:hover:bg-void-800 {% if '/me/workflows' in request.url.path %}menu-active text-nordic-600 dark:text-nordic-400{% else %}text-void-600 dark:text-void-300{% endif %}"
                        :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'"
@@ -152,6 +153,7 @@
                         <i class="fas fa-diagram-project w-5 text-center flex-shrink-0"></i>
                         <span class="sidebar-label">{{ _("Workflows") }}</span>
                     </a>
+                    {% endif %}
                     <a href="/me/vault"
                        class="flex items-center rounded-xl text-sm font-medium transition-all hover:bg-void-100 dark:hover:bg-void-800 {% if '/me/vault' in request.url.path %}menu-active text-nordic-600 dark:text-nordic-400{% else %}text-void-600 dark:text-void-300{% endif %}"
                        :class="sidebarCollapsed ? 'justify-center px-2 py-3' : 'gap-3 px-4 py-3'"
