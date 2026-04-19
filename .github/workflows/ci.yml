@@ -160,3 +160,75 @@ jobs:
 
       - name: Verify container structure
         run: docker run --rm gridbear:test python -c "import ui; import core; print('Import OK')"
+
+  smoke-install:
+    # Reproduces the README Setup block against a freshly-cloned workspace.
+    # Catches a class of bugs that unit tests can't:
+    #   - missing env secrets (POSTGRES_PASSWORD, INTERNAL_API_SECRET,
+    #     GRIDBEAR_MASTER_KEY) silently breaking first encrypt/decrypt
+    #   - compose override referencing a missing service (e.g. gridbear-ui
+    #     after the single-container refactor)
+    #   - plugin load failures at boot (import typos, bad manifest,
+    #     Dockerfile USER vs entrypoint mismatches)
+    #   - admin UI routes 500-ing at first paint
+    needs: build-docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Reproduce README Setup — config files
+        run: |
+          cp docker-compose.yml.example docker-compose.yml
+          [ -f .env.example ] && cp .env.example .env || touch .env
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -base64 24 | tr -d '/=+\n')"
+            echo "INTERNAL_API_SECRET=$(openssl rand -hex 32)"
+            echo "EXECUTOR_TOKEN=$(openssl rand -hex 32)"
+            echo "GRIDBEAR_MASTER_KEY=$(openssl rand -base64 64 | tr -d '/=+\n')"
+            echo "GRIDBEAR_BASE_URL=http://localhost:8088"
+            echo "WEBAUTHN_ORIGIN=http://localhost:8088"
+            echo "WEBAUTHN_RP_ID=localhost"
+          } >> .env
+
+      - name: docker compose up
+        run: |
+          docker compose up -d --build
+          echo "::group::Waiting for UI"
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://localhost:8088/auth/login; then
+              echo "UI reachable on attempt $i"
+              break
+            fi
+            sleep 2
+          done
+          echo "::endgroup::"
+
+      - name: Assert admin endpoints respond without 500
+        run: |
+          set -e
+          for path in /auth/login /auth/setup; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:8088${path}")
+            echo "$path -> $code"
+            test "${code:0:1}" != "5"
+          done
+
+      - name: Assert no plugin failed to load
+        run: |
+          logs=$(docker compose logs gridbear 2>&1)
+          if echo "$logs" | grep -E "(Plugin [a-z_]+ initialization failed|Failed to register routes|No encryption key found|cannot import name)" ; then
+            echo "::error::Plugin/import/encryption failure in startup logs — see above"
+            exit 1
+          fi
+
+      - name: Dump logs + teardown
+        if: always()
+        run: |
+          mkdir -p smoke-logs
+          docker compose logs > smoke-logs/compose.log 2>&1 || true
+          docker compose down -v --remove-orphans || true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: smoke-install-logs
+          path: smoke-logs/
