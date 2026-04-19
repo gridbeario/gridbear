@@ -121,20 +121,30 @@ class MCPTokenManager:
         return None
 
     def get_allowed_tools(self, agent_name: str) -> list[str]:
-        """Get per-server wildcard patterns for an agent's MCP permissions.
+        """Return the Claude-CLI allowlist pattern covering this gateway.
 
-        Generates patterns like 'mcp__gridbear-gateway__github__*' for each
-        server the agent has access to, based on its mcp_permissions.
-        Server names are sanitized the same way as in the gateway.
+        Claude Code's permission matcher treats an MCP tool name as three
+        double-underscore-separated parts: ``mcp__<server>__<tool>``. The
+        tool segment is a single unit even when it contains ``__`` itself
+        (e.g. ``artifacts__create_artifact`` or ``dwh_doreca__list_tables``).
+        A pattern with four segments (``mcp__<gw>__<sub>__*``) therefore
+        never matches the CLI's three-segment view of the tool name, and
+        every tool call fires the manual-approval popup regardless of
+        ``mcp_permissions``.
+
+        The right pattern is the three-segment form ``mcp__<gateway>__*``
+        which accepts every tool the gateway exposes. Per-server and
+        per-user ACL is still authoritative — it's enforced server-side
+        inside the gateway against the agent's bearer token (oauth2
+        client permissions). The client-side glob is only a coarse
+        outer fence; the fine filter is already where it belongs.
         """
         if agent_name not in self._agent_tokens:
             return []
         perms = self._agent_mcp_permissions.get(agent_name, [])
-        patterns = []
-        for server_name in perms:
-            sanitized = _MCP_NAME_RE.sub("_", server_name)
-            patterns.append(f"mcp__{self.GATEWAY_SERVER_NAME}__{sanitized}__*")
-        return patterns
+        if not perms:
+            return []
+        return [f"mcp__{self.GATEWAY_SERVER_NAME}__*"]
 
     def _write_agent_mcp_config(self, agent_name: str, token: str) -> None:
         """Write static MCP config file for an agent."""
