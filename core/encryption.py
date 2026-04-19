@@ -6,10 +6,13 @@ Storage format: base64(nonce_12bytes + ciphertext) as a single TEXT string.
 
 import base64
 import hashlib
+import logging
 import os
 from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+_logger = logging.getLogger(__name__)
 
 # Key search paths — same as ui/secrets_manager.py (no import dependency on ui/)
 _BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,9 +30,20 @@ _cached_key: bytes | None = None
 
 
 def _find_key_file() -> Path | None:
+    """Return the first path from KEY_PATHS that is BOTH existent AND readable.
+
+    Using `.exists()` alone hits a trap in containerised deploys: paths
+    like `/root/.ssh/id_ed25519` may exist (owned by root) but the
+    non-root container process can't read them. Picking such a path
+    here would crash every caller with `PermissionError [Errno 13]`.
+    """
     for p in KEY_PATHS:
-        if p.exists():
-            return p
+        try:
+            if p.exists() and os.access(p, os.R_OK):
+                return p
+        except OSError:
+            # stat() itself can fail on exotic mount errors — skip the path.
+            continue
     return None
 
 
@@ -41,9 +55,20 @@ def _get_key() -> bytes:
 
     key_file = _find_key_file()
     if key_file:
-        raw = key_file.read_bytes()
-        _cached_key = hashlib.sha256(raw).digest()
-        return _cached_key
+        try:
+            raw = key_file.read_bytes()
+            _cached_key = hashlib.sha256(raw).digest()
+            return _cached_key
+        except PermissionError as exc:
+            # Belt-and-suspenders: _find_key_file already filters unreadable
+            # paths, but a race (permissions dropped between check and read)
+            # is possible. Fall through to the env var instead of crashing.
+            _logger.warning(
+                "core.encryption: candidate key file %s unreadable (%s); "
+                "falling through to GRIDBEAR_MASTER_KEY",
+                key_file,
+                exc,
+            )
 
     env_val = os.environ.get(MASTER_KEY_ENV)
     if env_val:

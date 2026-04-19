@@ -181,7 +181,12 @@ class SecretsManager:
 
         for path in KEY_PATHS:
             try:
-                if path.exists():
+                # os.access(R_OK) is the right check: `.exists()` succeeds
+                # on a file the non-root container user can stat but not
+                # read (e.g. /root/.ssh/id_ed25519 on a deploy where
+                # KEY_PATHS still lists it). Picking such a path makes
+                # downstream read_bytes() crash with PermissionError.
+                if path.exists() and os.access(path, os.R_OK):
                     return path
             except (PermissionError, OSError):
                 continue
