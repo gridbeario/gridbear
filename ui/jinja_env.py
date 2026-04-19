@@ -31,6 +31,21 @@ def _jinja_translate(message: str) -> str:
 templates.env.globals["_"] = _jinja_translate
 
 
+def _plugin_enabled(name: str) -> bool:
+    """Template helper: is the given plugin installed and enabled?
+
+    Used to guard hardcoded menu links in templates (e.g. the user
+    portal sidebar) against enterprise plugins that may not be
+    present on this install.
+    """
+    from ui.plugin_helpers import get_enabled_plugins
+
+    return name in get_enabled_plugins()
+
+
+templates.env.globals["plugin_enabled"] = _plugin_enabled
+
+
 def _load_active_theme_data() -> dict:
     """Load theme data from the active theme plugin.
 
