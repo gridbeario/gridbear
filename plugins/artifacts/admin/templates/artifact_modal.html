@@ -124,11 +124,17 @@ function artifactModal() {
 
   // Given a message container (.msg-agent), find the .prose content,
   // extract artifact URLs, and append one card per unique URL (dedup).
+  // Agents commonly emit the URL as a markdown link — the rendered
+  // textContent only carries the label, not the href — so we also
+  // harvest hrefs from any <a> in the prose.
   function decorate(container) {
     if (!container || container.nodeType !== 1) return;
     const prose = container.querySelector ? container.querySelector('.prose') : null;
     if (!prose) return;
-    const text = prose.textContent || '';
+    const hrefs = Array.from(prose.querySelectorAll('a[href]'))
+      .map(function(a) { return a.getAttribute('href') || ''; })
+      .join(' ');
+    const text = (prose.textContent || '') + ' ' + hrefs;
     const urls = extractUrls(text);
     if (!urls.length) return;
     for (const url of urls) {
