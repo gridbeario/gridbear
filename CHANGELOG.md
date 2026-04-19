@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-04-19
+
+### Added
+
+- **Artifacts plugin**: agents can emit standalone HTML artifacts served via capability URLs. MCP tool `create_artifact`, HMAC-signed share tokens, TTL + pin/revoke state, `/me/artifacts` portal page, admin UI with list/detail/actions, sandboxed webchat preview modal with URL detection, background cleanup worker. Wrapper page ships Copy-link and Open-in-tab actions.
+- **WhatsApp Meta Cloud API channel** (`whatsapp_api`): direct Meta Cloud API integration as an alternative to Evolution. Webhook HMAC validation, authorized-numbers management UI, `access_token`/`phone_number_id` as plugin-level secrets, media upload/send logging. Legacy `whatsapp` plugin renamed to `whatsapp_evolution` for clarity. Plugins can now opt into `public_api: true` in the manifest to mount their API router on the public UI app (needed for external webhook endpoints).
+- **Backup plugin**: scheduled database + secrets backups with optional S3 upload. `boto3` and `postgresql-client` shipped in the image.
+- **Session TTL**: `session_ttl_minutes` in agent `context_options` auto-expires stale conversation sessions and prefixes the next response with a notice.
+- **Service-account identity**: `service_account` in agent `context_options` overrides MCP identity so the agent acts with its own credentials instead of the sender's.
+- **CI smoke-install job**: reproduces the README Setup flow end-to-end on every PR to catch fresh-install regressions that only appear against an empty DB.
+- **Auto-advance for Planning plugin**: plan tasks advance automatically without requiring model cooperation.
+- **Deep-link post-login redirect**: `/auth/login` honours `post_login_redirect` so share links and deep URLs survive the login wall.
+- **Diagnostics**: optional prompt-dump toggle in settings for debugging agent context.
+
+### Fixed
+
+- **Fresh-install crash loop**: multiple independent bugs surfaced on empty databases — ORM could not discover `SystemConfig` / config models, boot failed without any agents or runners, default-company INSERT referenced a dropped `plan` column, and the `user_mcp_permissions` unified-id backfill migration crashed when `app.user_identities` did not exist. All paths now tolerate day-zero state.
+- **MCP tool routing**: gateway allowlist pattern corrected from 4 segments (`mcp__<gw>__<server>__*`, which never matched Claude's parser) to 3 (`mcp__<gateway>__*`). Claude runner now applies each agent's `mcp_permissions` to `--allowedTools` instead of relying on server-side filtering alone, and the MCP gateway falls through when a user has no explicit permissions (matching the docstring) rather than zapping every namespaced tool.
+- **Agent MCP isolation**: Claude runner invoked with `--strict-mcp-config` to prevent MCP pollution from `.claude.json` and claude.ai remote connectors.
+- **Claude OAuth leak**: non-pool subprocess path now receives the same OAuth env as the pooled path, so fallback execution still authenticates.
+- **Master-key handling**: `_find_key_file` skips unreadable paths (e.g. `/root/.ssh/`) instead of aborting, falls through on race conditions.
+- **Avatars persist on rebuild**: `AVATARS_DIR` moved under `data/`, served via dedicated `/static/avatars` StaticFiles mount. Legacy files under `ui/static/avatars/` are migrated on first boot. The dedicated bind-mount in `docker-compose.yml.example` is removed — the standard `./data:/app/data` now suffices.
+- **Agent save preserves state**: avatar, `context_options`, `services`, and custom per-channel fields are no longer wiped when editing an agent. Single-agent hot-reload also re-binds message handlers on the new channel instances.
+- **Permissions page on fresh install**: `/permissions` form ("Add/Edit User") now lists MCP servers even without runtime `PluginManager` in the UI container — it falls back to enabled plugins in the DB registry and their manifests (new `ui/utils/mcp_servers.py`, mirroring `channels.py`).
+- **Base URL mismatch**: dashboard emits a persistent warning when `GRIDBEAR_BASE_URL` points to localhost but the request reaches from a non-loopback host, so share links / WebAuthn / OAuth misconfiguration is visible immediately.
+- **Docker entrypoint**: fixes bind-mount ownership on startup for `data/`, `config/`, `credentials/`.
+- **docker-compose.yml shipped as `.example`**: the tracked compose file is now a template — operators copy it to `docker-compose.yml` so local customisation is not clobbered on `git pull`.
+- **WhatsApp API media sending**: media URL validation fixed; `phone_number_id` is now configurable from the admin UI instead of hard-coded.
+- **Webchat in shared conversations**: plan execution messages correctly mention the agent name.
+- **Artifact Preview card missing on markdown links**: webchat sniffer now harvests hrefs from `<a>` tags in addition to rendered text, so artifact URLs emitted as `[Title](url)` by the agent are detected and decorated with Preview / New-tab buttons.
+
+### Improved
+
+- **Conversation docs via MCP tool**: previously injected into every prompt, now exposed as a tool so the agent reads them only when relevant — saves context tokens.
+- **Prompt via stdin**: Claude CLI now receives the prompt on stdin instead of argv, avoiding `ARG_MAX` truncation on very long contexts.
+- **Plugin admin hardening**: menu gate, no-op `shutdown()` stubs where missing, summary log after MCP tool discovery for easier diagnosis.
+- **README**: master-key generation step documented in the install flow; operations that still require a restart are now explicitly listed.
+- **Dependency bumps**: `psycopg >= 3.3.3`, `pymupdf >= 1.27.2.2`, `msal >= 1.36.0`, `ruff >= 0.15.10`, `anthropic >= 0.94.0`, `pre-commit >= 4.5.1`, `google-auth-oauthlib >= 1.3.1`, `python-docx >= 1.2.0`, plus the minor-and-patch dependabot group.
+
 ## [0.8.0] - 2026-04-11
 
 ### Architecture
