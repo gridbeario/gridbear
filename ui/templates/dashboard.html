@@ -6,6 +6,43 @@
 {% block page_description %}<p class="text-void-500 dark:text-void-400 mt-1">{{ _("Overview of your AI agent ecosystem") }}</p>{% endblock %}
 
 {% block content %}
+{# --- Public URL sanity check -------------------------------------------- #}
+{# GRIDBEAR_BASE_URL is baked into artifact share links, OAuth callbacks,   #}
+{# and WebAuthn challenges. When it points at localhost but the admin is   #}
+{# reaching the dashboard from a real hostname/IP, every link emitted by   #}
+{# the bot is unopenable from anywhere else. Warn loudly until the env     #}
+{# variables are fixed. See .env.example for the three variables to set.   #}
+{% set base_url = config_base_url or '' %}
+{% set request_host = request.url.hostname or '' %}
+{% set _lo = ('localhost', '127.0.0.1', '0.0.0.0', 'host.docker.internal') %}
+{% set base_url_is_localhost = 'localhost' in base_url or '127.0.0.1' in base_url %}
+{% set reached_via_localhost = request_host in _lo %}
+{% if base_url_is_localhost and not reached_via_localhost %}
+<div class="mb-6 p-4 rounded-xl bg-ember-500/10 border border-ember-500/30 text-ember-600 dark:text-ember-400">
+    <div class="flex items-start gap-3">
+        <i class="fas fa-exclamation-triangle mt-0.5"></i>
+        <div class="flex-1 text-sm">
+            <div class="font-semibold mb-1">{{ _("Base URL mismatch") }}</div>
+            <p>
+                <code>GRIDBEAR_BASE_URL</code> is set to
+                <code>{{ base_url or '(unset)' }}</code>, but you're reaching this
+                dashboard at <code>{{ request_host }}</code>. Every link the bot
+                emits — artifact URLs, OAuth callbacks, WebAuthn origin — will
+                still point at <code>localhost</code> and be unopenable from
+                outside this host.
+            </p>
+            <p class="mt-2">
+                Edit <code>.env</code> and set all three to match the real public URL, then
+                <code>docker compose restart gridbear</code>:
+            </p>
+            <pre class="mt-2 p-2 bg-void-900/60 dark:bg-void-900 text-void-100 rounded text-xs overflow-x-auto">GRIDBEAR_BASE_URL=http://{{ request_host }}:8088
+WEBAUTHN_RP_ID={{ request_host }}
+WEBAUTHN_ORIGIN=http://{{ request_host }}:8088</pre>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Hero Stats Card -->
 <div class="relative overflow-hidden rounded-2xl gradient-border p-6 mb-8">
     <div class="relative z-10">
