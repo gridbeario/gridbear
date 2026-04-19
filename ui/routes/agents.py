@@ -14,7 +14,7 @@ from ui.routes.auth import require_login
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-AVATARS_DIR = BASE_DIR / "ui" / "static" / "avatars"
+AVATARS_DIR = BASE_DIR / "data" / "avatars"
 ALLOWED_AVATAR_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
 

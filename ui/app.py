@@ -153,6 +153,27 @@ for _pname, _manifest in _all_manifests.items():
                     name=f"theme-static-{_pname}",
                 )
 
+# Agent avatars live under data/ so they persist via the ./data:/app/data
+# bind-mount. Keeping them under ui/static would require a dedicated mount
+# in docker-compose.yml that not every existing deploy has — see issue where
+# avatars vanished on container rebuild for installs predating 8c229bd.
+_AVATARS_DIR = BASE_DIR / "data" / "avatars"
+_AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+
+_legacy_avatars = ADMIN_DIR / "static" / "avatars"
+if (
+    _legacy_avatars.is_dir()
+    and any(_legacy_avatars.iterdir())
+    and not any(_AVATARS_DIR.iterdir())
+):
+    import shutil
+
+    for _f in _legacy_avatars.iterdir():
+        if _f.is_file():
+            shutil.move(str(_f), str(_AVATARS_DIR / _f.name))
+    logger.info("Migrated agent avatars from ui/static/avatars to data/avatars")
+
+app.mount("/static/avatars", StaticFiles(directory=_AVATARS_DIR), name="avatars")
 app.mount("/static", StaticFiles(directory=ADMIN_DIR / "static"), name="static")
 
 from ui.jinja_env import rebuild_template_loader, templates  # noqa: E402
