@@ -314,6 +314,26 @@ async def migrate_mcp_perms_to_unified_id() -> bool:
 
     db = get_database()
     async with db.acquire() as conn:
+        # Fresh-install guard: the backfill JOINs against app.user_identities,
+        # a legacy table that only exists on upgraded installs. A brand-new
+        # database has the target table (user_mcp_permissions, ORM-managed)
+        # AND still has the `username` column (it's a current model field,
+        # not legacy), so the column check alone is not enough to bail out —
+        # without this guard the subsequent SQL raises UndefinedTable and
+        # kills the boot sequence on every fresh deploy.
+        ui_check = await conn.execute(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = 'app' AND table_name = 'user_identities'"
+        )
+        if not await ui_check.fetchone():
+            logger.info(
+                "app.user_identities not found — no legacy mapping to "
+                "migrate; marking %s complete.",
+                _MARKER_MCP_PERMS_UNIFIED_ID,
+            )
+            await SystemConfig.set_param(_MARKER_MCP_PERMS_UNIFIED_ID, True)
+            return False
+
         # Check if the old username column still exists
         col_check = await conn.execute(
             "SELECT 1 FROM information_schema.columns "
