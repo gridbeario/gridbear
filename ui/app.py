@@ -830,6 +830,10 @@ async def dashboard(request: Request, _: dict = Depends(require_login)):
             gmail_accounts=config.get_gmail_accounts(),
             user_identities=config.get_user_identities(),
             agents_count=get_agents_count(),
+            # Exposed so the template can warn when the configured public
+            # URL doesn't match where the admin is actually reaching the
+            # dashboard from (see dashboard.html base-url sanity check).
+            config_base_url=os.environ.get("GRIDBEAR_BASE_URL", ""),
             plugins_summary={
                 "channels": len(plugins["channels"]),
                 "services": len(plugins["services"]),
