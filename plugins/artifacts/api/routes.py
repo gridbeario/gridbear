@@ -108,6 +108,9 @@ def _wrapper_html(
     size_kb = size_bytes // 1024 or 1
     safe_title = _html_escape(title)
     share_qs = f"&amp;s={share}" if share else ""
+    # The share URL is the current page; users who arrived here via
+    # WhatsApp/Telegram/email often don't see the address bar (mobile
+    # preview modals, in-app browsers) — expose explicit actions.
     return f"""<!doctype html>
 <html>
 <head>
@@ -120,14 +123,58 @@ def _wrapper_html(
   <style>
     body {{ margin: 0; font-family: system-ui, sans-serif; }}
     .top-bar {{ display: flex; justify-content: space-between; align-items: center;
-               padding: 12px 16px; background: #1a1a1a; color: #fff; height: 48px; }}
+               padding: 12px 16px; background: #1a1a1a; color: #fff; height: 48px; gap: 12px; }}
+    .top-bar h1 {{ margin: 0; font-size: 14px; font-weight: 500;
+                   flex: 1; overflow: hidden; text-overflow: ellipsis;
+                   white-space: nowrap; }}
+    .top-bar .actions {{ display: flex; gap: 8px; flex-shrink: 0; }}
+    .top-bar button, .top-bar a {{
+        background: #2a2a2a; color: #fff; border: 1px solid #3a3a3a;
+        padding: 4px 10px; border-radius: 6px; font-size: 12px;
+        cursor: pointer; text-decoration: none;
+    }}
+    .top-bar button:hover, .top-bar a:hover {{ background: #3a3a3a; }}
     iframe {{ width: 100%; height: calc(100vh - 48px); border: 0; display: block; }}
+    #copy-ok {{ color: #4ade80; font-size: 12px; display: none; }}
+    #copy-ok.visible {{ display: inline; }}
   </style>
 </head>
 <body>
-  <header class="top-bar"><h1>{safe_title}</h1></header>
+  <header class="top-bar">
+    <h1>{safe_title}</h1>
+    <div class="actions">
+      <span id="copy-ok">Copied</span>
+      <button type="button" onclick="copyShareUrl()">Copy link</button>
+      <a href="/artifacts/{uid}?t={token}{share_qs}&amp;mode=embed" target="_blank" rel="noopener">
+        Open in tab
+      </a>
+    </div>
+  </header>
   <iframe src="/artifacts/{uid}?t={token}{share_qs}&amp;mode=embed"
           sandbox="allow-scripts" allow="clipboard-write"></iframe>
+  <script>
+    function copyShareUrl() {{
+      const url = window.location.href;
+      const ok = document.getElementById('copy-ok');
+      const done = () => {{
+        ok.classList.add('visible');
+        setTimeout(() => ok.classList.remove('visible'), 1500);
+      }};
+      if (navigator.clipboard) {{
+        navigator.clipboard.writeText(url).then(done).catch(() => {{
+          const ta = document.createElement('textarea');
+          ta.value = url; document.body.appendChild(ta);
+          ta.select(); document.execCommand('copy'); ta.remove();
+          done();
+        }});
+      }} else {{
+        const ta = document.createElement('textarea');
+        ta.value = url; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy'); ta.remove();
+        done();
+      }}
+    }}
+  </script>
 </body>
 </html>"""
 
