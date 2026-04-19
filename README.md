@@ -97,9 +97,28 @@ nano config/plugins.json
 # Start
 docker compose up -d
 
+# Generate the master key used to encrypt all Secrets Manager entries
+# (bot tokens, OAuth refresh tokens, per-plugin DB passwords, TOTP
+# seeds, etc.). Uses the container's Python env, writes the file to
+# /app/config/secrets.key which persists on the host as ./config/secrets.key
+# via the bind mount. chmod 0600 is applied automatically.
+docker exec gridbear python3 -c \
+  "from ui.secrets_manager import SecretsManager; print(SecretsManager.generate_key_file())"
+
+# >>> BACK UP ./config/secrets.key OUT-OF-BAND <<<
+# Losing this file makes every row in vault.secrets unreadable and
+# there is no recovery path — you would need to re-enter every
+# credential from scratch.
+
 # Create admin account
 # Visit http://localhost:8088/auth/setup
 ```
+
+> **Alternative to the key file**: if you prefer an env var (e.g. for
+> ephemeral deployments that inject secrets from a KMS), set
+> `GRIDBEAR_MASTER_KEY=$(openssl rand -base64 64)` in `.env` instead of
+> running `generate_key_file()`. The file takes precedence when both
+> exist — pick one source of truth and back it up.
 
 ### Agent Configuration
 
