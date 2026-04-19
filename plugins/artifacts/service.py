@@ -51,6 +51,14 @@ class ArtifactsService:
         """No-op initializer — service is stateless."""
         return None
 
+    async def shutdown(self) -> None:
+        """No-op shutdown — service is stateless (no pool / no long-lived state).
+
+        Present to satisfy the plugin manager's reload / stop contract;
+        without it every reload logs a noisy AttributeError.
+        """
+        return None
+
     async def create(
         self,
         *,

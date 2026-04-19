@@ -494,6 +494,7 @@
                     {% endif %}
 
                     <!-- Data -->
+                    {% if 'memory' in enabled_services %}
                     <div data-section="data">
                         <h3 @click="toggle('data')"
                             class="px-4 mb-2 text-[10px] font-semibold uppercase tracking-widest text-void-400 dark:text-void-500 cursor-pointer select-none flex items-center justify-between">
@@ -514,6 +515,7 @@
                             </a>
                         </div>
                     </div>
+                    {% endif %}
 
                     <!-- System -->
                     <div data-section="system">

@@ -73,3 +73,13 @@ def discover_local_tool_providers(mcp_server) -> None:
             logger.error(f"Failed to load virtual tools from {plugin_name}: {e}")
 
     mcp_server.set_local_tool_providers(providers)
+
+    # Summary line so operators can spot "zero providers registered" at a
+    # glance when diagnosing a tool-not-found report. The per-provider
+    # INFO lines above are easy to miss in the startup log.
+    server_names = [p.get_server_name() for p in providers]
+    logger.info(
+        "Local tool providers: registered %d — %s",
+        len(providers),
+        server_names or "(none)",
+    )
