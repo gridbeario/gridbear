@@ -232,11 +232,12 @@ def _filter_by_permissions(tools: list[dict], mcp_permissions: list[str]) -> lis
 def _filter_by_user_mcp_permissions(tools: list[dict], unified_id: str) -> list[dict]:
     """Filter tools by per-user MCP permissions (set in admin /permissions page).
 
-    If the user has no explicit permissions, all tools pass through (backwards compat).
-    If the user has permissions, only namespaced tools from allowed servers are kept.
-    Non-namespaced tools (gridbear_help, send_file_to_chat, etc.) always pass through.
-    System callers (inter-agent, workflow) bypass user-level filtering — they
-    rely on agent-level mcp_permissions instead.
+    If the user has no explicit permissions, all tools pass through (agent-level
+    mcp_permissions has already been enforced upstream). If the user has
+    permissions, only namespaced tools from allowed servers are kept.
+    Non-namespaced tools (gridbear_help, send_file_to_chat, etc.) always pass
+    through. System callers (inter-agent, workflow) bypass user-level filtering
+    — they rely on agent-level mcp_permissions instead.
     """
     # System callers are not real users — skip per-user filtering
     if unified_id and unified_id.startswith("inter_agent:"):
@@ -247,9 +248,13 @@ def _filter_by_user_mcp_permissions(tools: list[dict], unified_id: str) -> list[
 
         user_perms = get_user_mcp_permissions(unified_id)
         if not user_perms:
-            # No permissions configured = no MCP tools allowed.
-            # Keep only non-namespaced built-in tools.
-            return [t for t in tools if "__" not in t.get("name", "")]
+            # No per-user perms configured → defer entirely to the agent-level
+            # filter that has already run on this list. Returning only the
+            # non-namespaced subset (the previous behaviour) silently killed
+            # every MCP tool on any deploy that hadn't hand-populated
+            # app.user_mcp_permissions — directly contradicting the docstring
+            # contract this function advertises.
+            return tools
         pre = len(tools)
         reverse_map = _client_manager._sanitized_to_original if _client_manager else {}
         from core.permissions.mcp_resolver import matches_permission
