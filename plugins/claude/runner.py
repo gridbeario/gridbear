@@ -596,9 +596,13 @@ class ClaudeRunner(BaseRunner):
         if mcp_config and mcp_config.exists():
             cmd.extend(["--mcp-config", str(mcp_config), "--strict-mcp-config"])
 
-        # Add file operation permissions
-        # Permissions: file ops + MCP gateway wildcard from claude_settings.json
-        all_perms = self._get_file_permissions()
+        # Add file operation permissions from SystemConfig AND the agent-
+        # specific MCP allowlist from the token manager. Skipping the
+        # latter means every tool call fires the manual-approval popup,
+        # which breaks non-interactive channels (WebChat, Telegram) where
+        # there's nobody to click Allow.
+        all_perms = list(self._get_file_permissions())
+        all_perms.extend(self._get_mcp_allowed_tools(agent_id))
         if all_perms:
             cmd.extend(["--allowedTools"] + all_perms)
 

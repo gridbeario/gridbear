@@ -249,14 +249,27 @@ class ClaudeProcessPool:
         if mcp_config_path:
             cmd.extend(["--mcp-config", mcp_config_path, "--strict-mcp-config"])
 
-        # Add permissions from settings (includes MCP gateway wildcard)
-        all_perms = []
+        # Add permissions from settings (file ops + gateway wildcard from
+        # claude_settings) AND the agent-specific MCP allowlist from the
+        # token manager. Without the token-manager addition every tool
+        # call fires the manual-approval popup, breaking non-interactive
+        # channels (WebChat, Telegram) where no human can click Allow.
+        all_perms: list[str] = []
         try:
             from core.system_config import SystemConfig
 
             settings = SystemConfig.get_param_sync("claude_settings")
             if settings:
-                all_perms = settings.get("permissions", {}).get("allow", [])
+                all_perms = list(settings.get("permissions", {}).get("allow", []) or [])
+        except Exception:
+            pass
+
+        try:
+            from core.mcp_token_manager import get_mcp_token_manager
+
+            tm = get_mcp_token_manager()
+            if tm:
+                all_perms.extend(tm.get_allowed_tools(agent_id))
         except Exception:
             pass
 
