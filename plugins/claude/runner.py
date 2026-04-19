@@ -630,12 +630,19 @@ class ClaudeRunner(BaseRunner):
             retry_without_resume: Retry without --resume on session expiry.
             stdin_data: Data to pass via stdin (used for prompt).
         """
+        # Inject CLAUDE_CODE_OAUTH_TOKEN the same way the pool path does,
+        # otherwise the CLI authenticates as anonymous and every call fails
+        # when use_pool=False (the default). See _get_cli_env for the full
+        # secrets-manager + refresh flow.
+        from plugins.claude.api.routes import _get_cli_env
+
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdin=asyncio.subprocess.PIPE if stdin_data else None,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=self.working_dir,
+            env=_get_cli_env(),
             limit=4 * 1024 * 1024,  # 4MB buffer for large MCP responses
         )
 
