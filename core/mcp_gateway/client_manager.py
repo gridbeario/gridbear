@@ -1163,26 +1163,30 @@ class MCPClientManager:
                         f"to {server_name}: {e}" + (f" | sub: {sub}" if sub else ""),
                         exc_info=True,
                     )
-                    # Mark token as expired if auth failure (401/unauthorized)
-                    if "401" in err_str or "unauthorized" in err_str:
+                    # Only surface the failure as a user-facing notification
+                    # when it's an actionable auth problem — not for
+                    # transient network / TaskGroup-wrapped errors that the
+                    # next request typically recovers from on its own.
+                    is_auth_error = "401" in err_str or "unauthorized" in err_str
+                    if is_auth_error:
                         conn_id = self._known_servers[server_name].service_connection_id
                         if conn_id:
                             _mark_token_expired(unified_id, conn_id)
-                    try:
-                        from ui.services.notifications import NotificationService
+                        try:
+                            from ui.services.notifications import NotificationService
 
-                        asyncio.ensure_future(
-                            NotificationService.get().create(
-                                category="oauth_expired",
-                                severity="error",
-                                title=f"Connection failed: {server_name}",
-                                message=str(e)[:200],
-                                source=server_name,
-                                user_id=unified_id,
+                            asyncio.ensure_future(
+                                NotificationService.get().create(
+                                    category="oauth_expired",
+                                    severity="error",
+                                    title=f"Connection failed: {server_name}",
+                                    message=str(e)[:200],
+                                    source=server_name,
+                                    user_id=unified_id,
+                                )
                             )
-                        )
-                    except Exception:
-                        pass
+                        except Exception:
+                            pass
                 return None
 
         return conn
