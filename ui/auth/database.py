@@ -347,13 +347,20 @@ class AuthDatabase:
         )
         return [dict(r) for r in rows]
 
-    def update_session_activity(self, session_token: str) -> bool:
-        """Update last activity timestamp for a session."""
+    def update_session_activity(
+        self,
+        session_token: str,
+        new_expires_at: Optional[datetime] = None,
+    ) -> bool:
+        """Update last activity timestamp, and optionally slide expires_at."""
         from ui.auth.models import AdminSession
 
+        fields = {"last_activity": datetime.now()}
+        if new_expires_at is not None:
+            fields["expires_at"] = new_expires_at
         updated = AdminSession.write_multi_sync(
             [("session_token", "=", session_token)],
-            last_activity=datetime.now(),
+            **fields,
         )
         return updated > 0
 

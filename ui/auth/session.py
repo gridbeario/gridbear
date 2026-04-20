@@ -23,17 +23,29 @@ def _ensure_naive_dt(val: datetime) -> datetime:
 from ui.auth.database import auth_db
 
 SESSION_COOKIE_NAME = "gridbear_session_token"
-SESSION_DURATION_HOURS = 8
+# Inactivity timeout: the session expires after this much time without any
+# authenticated request. Each validated request slides expires_at forward.
+SESSION_INACTIVITY_HOURS = int(os.getenv("GRIDBEAR_SESSION_INACTIVITY_HOURS", "72"))
+# Absolute hard cap from the moment of login — the session cannot be
+# extended past this, even under continuous activity. Protects against a
+# stolen cookie being refreshed indefinitely.
+SESSION_ABSOLUTE_MAX_DAYS = int(os.getenv("GRIDBEAR_SESSION_MAX_DAYS", "30"))
 SESSION_TOKEN_BYTES = 64
 
 
 class SessionManager:
-    """Manages persistent admin sessions."""
+    """Manages persistent admin sessions with sliding expiration.
+
+    Sessions expire after ``SESSION_INACTIVITY_HOURS`` of inactivity,
+    but never live longer than ``SESSION_ABSOLUTE_MAX_DAYS`` from login
+    regardless of activity.
+    """
 
     def __init__(self):
         self.db = auth_db
         self.cookie_name = SESSION_COOKIE_NAME
-        self.session_duration = timedelta(hours=SESSION_DURATION_HOURS)
+        self.inactivity_window = timedelta(hours=SESSION_INACTIVITY_HOURS)
+        self.absolute_max = timedelta(days=SESSION_ABSOLUTE_MAX_DAYS)
 
     def create_session(
         self,
@@ -46,7 +58,7 @@ class SessionManager:
         Returns the session token.
         """
         token = secrets.token_hex(SESSION_TOKEN_BYTES)
-        expires_at = datetime.now() + self.session_duration
+        expires_at = datetime.now() + self.inactivity_window
 
         ip_address = self._get_client_ip(request)
         user_agent = request.headers.get("user-agent", "")[:500]
@@ -59,7 +71,7 @@ class SessionManager:
             user_agent=user_agent,
         )
 
-        self._set_cookie(response, token, expires_at)
+        self._set_cookie(response, token)
 
         self.db.update_user(user_id, last_login=datetime.now().isoformat())
 
@@ -78,15 +90,29 @@ class SessionManager:
         if not session:
             return None
 
-        if _ensure_naive_dt(session["expires_at"]) < datetime.now():
+        now = datetime.now()
+        if _ensure_naive_dt(session["expires_at"]) < now:
             self.db.delete_session(token)
             return None
+
+        # Absolute hard cap: expire sessions that have been alive longer
+        # than SESSION_ABSOLUTE_MAX_DAYS regardless of activity.
+        created_at = session.get("created_at")
+        if created_at is not None:
+            age_limit = _ensure_naive_dt(created_at) + self.absolute_max
+            if now > age_limit:
+                self.db.delete_session(token)
+                return None
+        else:
+            age_limit = now + self.inactivity_window
 
         user = self.db.get_user_by_id(session["user_id"])
         if not user or not user.get("is_active"):
             return None
 
-        self.db.update_session_activity(token)
+        # Slide expires_at forward on activity, capped at the absolute max.
+        new_expires_at = min(now + self.inactivity_window, age_limit)
+        self.db.update_session_activity(token, new_expires_at=new_expires_at)
 
         return user
 
@@ -144,10 +170,17 @@ class SessionManager:
     def _is_https() -> bool:
         return os.getenv("ADMIN_HTTPS_ONLY", "false").lower() == "true"
 
-    def _set_cookie(self, response: Response, token: str, expires_at: datetime) -> None:
-        """Set the session cookie with security flags."""
+    def _set_cookie(self, response: Response, token: str) -> None:
+        """Set the session cookie with security flags.
+
+        Cookie lifetime is pinned to the absolute max so the browser
+        keeps sending it as long as the server considers the session
+        valid. Server-side inactivity enforcement happens in
+        ``validate_session`` (the DB row's ``expires_at`` shrinks the
+        effective window even though the cookie lives longer).
+        """
         https = self._is_https()
-        max_age = int((expires_at - datetime.now()).total_seconds())
+        max_age = int(self.absolute_max.total_seconds())
         response.set_cookie(
             key=self.cookie_name,
             value=token,
