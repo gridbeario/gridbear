@@ -89,6 +89,7 @@ docker-compose.override.yml
 !CHANGELOG.md
 !LICENSE
 !plugins/*/skills/*.md
+!docs/**/*.md
 *.txt
 !executor/requirements.txt
 
