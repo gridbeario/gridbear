@@ -33,6 +33,10 @@ async def gmail_oauth_start(
 
     request.session["oauth_state"] = state
     request.session["oauth_conn"] = "gmail:gmail"
+    # google-auth-oauthlib ≥1.3 enables PKCE by default: flow.code_verifier
+    # is generated above and MUST be replayed in the callback's fetch_token
+    # exchange — otherwise Google rejects with "Missing code verifier".
+    request.session["oauth_code_verifier"] = getattr(flow, "code_verifier", None)
     return RedirectResponse(url=auth_url, status_code=303)
 
 
@@ -45,6 +49,7 @@ async def gmail_oauth_callback(
     code = request.query_params.get("code")
     state = request.query_params.get("state")
     session_state = request.session.pop("oauth_state", None)
+    code_verifier = request.session.pop("oauth_code_verifier", None)
     request.session.pop("oauth_conn", None)
 
     if not code or not state or state != session_state:
@@ -67,6 +72,8 @@ async def gmail_oauth_callback(
 
     try:
         flow = get_flow(redirect_uri)
+        if code_verifier:
+            flow.code_verifier = code_verifier
         flow.fetch_token(code=code)
         credentials = flow.credentials
 
