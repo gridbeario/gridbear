@@ -104,6 +104,10 @@ dev = [
     "mypy>=1.8.0",
     "pre-commit>=4.5.1",
     "pytest-benchmark>=4.0",
+    # Docs site (MkDocs Material) — used to build docs.gridbear.io.
+    "mkdocs-material>=9.5",
+    "mkdocs-material[imaging]",
+    "pymdown-extensions>=10.7",
 ]
 
 [project.scripts]

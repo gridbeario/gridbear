@@ -12,6 +12,10 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        # mkdocs.yml uses Python-tagged YAML constructors
+        # (e.g. !!python/name:pymdownx.superfences.fence_code_format)
+        # which the stock YAML loader can't instantiate.
+        exclude: ^mkdocs\.yml$
       - id: check-added-large-files
         args: ['--maxkb=1000']
       - id: check-merge-conflict

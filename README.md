@@ -200,6 +200,10 @@ scripts/            Database init and maintenance scripts
 tests/              Unit and integration tests
 ```
 
+## Documentation
+
+Full documentation — Getting Started, Architecture, Plugin Development, API Reference, Changelog — lives at **[docs.gridbear.io](https://docs.gridbear.io)**. Preview locally with `mkdocs serve` after `pip install -e ".[dev]"` — the source sits under `docs/`.
+
 ## Community
 
 - [Discord](https://discord.gg/WhTK4PPmaE) — chat and realtime Q&A

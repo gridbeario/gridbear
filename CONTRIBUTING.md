@@ -142,6 +142,17 @@ Before opening a PR, consider discussing your approach on [Discord](https://disc
 - All CI checks must pass (lint, tests, type-check)
 - Describe the **why** in the PR description, not just the what
 
+## Documentation
+
+The public docs site (**[docs.gridbear.io](https://docs.gridbear.io)**) is built with MkDocs Material from the `docs/` directory. To preview locally:
+
+```bash
+pip install -e ".[dev]"
+mkdocs serve
+```
+
+Open `http://localhost:8000`. Pages edit live on save. The GitHub Actions workflow `.github/workflows/docs.yml` deploys every push to `main` that touches `docs/**`, `mkdocs.yml`, or `CHANGELOG.md`.
+
 ## Reporting Issues & Proposing Changes
 
 Pick the right channel:
@@ -151,8 +162,8 @@ Pick the right channel:
   - *RFC / Design* — propose a non-trivial change (new plugin, architecture shift, cross-cutting refactor). Post the design first, iterate, then open a PR that links back to the discussion.
   - *Ideas* — informal "what if we…" suggestions not yet ready for a full RFC.
   - *Q&A* — usage questions, setup help.
-- **[SECURITY.md](SECURITY.md)** — security vulnerabilities (do **not** open a public Issue or Discussion for these).
+- **[SECURITY.md](https://github.com/gridbeario/gridbear/blob/main/SECURITY.md)** — security vulnerabilities (do **not** open a public Issue or Discussion for these).
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [LGPL-3.0 License](LICENSE).
+By contributing, you agree that your contributions will be licensed under the [LGPL-3.0 License](https://github.com/gridbeario/gridbear/blob/main/LICENSE).
