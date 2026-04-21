@@ -142,12 +142,16 @@ Before opening a PR, consider discussing your approach on [Discord](https://disc
 - All CI checks must pass (lint, tests, type-check)
 - Describe the **why** in the PR description, not just the what
 
-## Reporting Issues
+## Reporting Issues & Proposing Changes
 
-- Use GitHub Issues for bug reports and feature requests
-- For security vulnerabilities, see [SECURITY.md](SECURITY.md)
-- Include steps to reproduce for bug reports
-- Check existing issues before opening a new one
+Pick the right channel:
+
+- **[GitHub Issues](https://github.com/gridbeario/gridbear/issues)** — bug reports and concrete feature requests (something broken or a well-scoped ask ready to be worked on). Include steps to reproduce for bugs; check existing issues before opening a new one.
+- **[GitHub Discussions](https://github.com/gridbeario/gridbear/discussions)** — open-ended conversations and design work:
+  - *RFC / Design* — propose a non-trivial change (new plugin, architecture shift, cross-cutting refactor). Post the design first, iterate, then open a PR that links back to the discussion.
+  - *Ideas* — informal "what if we…" suggestions not yet ready for a full RFC.
+  - *Q&A* — usage questions, setup help.
+- **[SECURITY.md](SECURITY.md)** — security vulnerabilities (do **not** open a public Issue or Discussion for these).
 
 ## License
 
