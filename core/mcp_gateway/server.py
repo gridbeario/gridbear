@@ -341,11 +341,40 @@ def _load_agent_config(agent_name: str) -> dict | None:
 
 
 def invalidate_agent_config_cache(agent_name: str | None = None) -> None:
-    """Invalidate agent config cache. Called on reload."""
+    """Invalidate agent config cache. Called on reload.
+
+    Also drops any ``_tools_cache`` entries tied to the agent so that
+    ``mcp_permissions``, ``service_account``, ``max_tools`` or other
+    changes land immediately instead of waiting for the 120s TTL to
+    expire.
+    """
     if agent_name:
         _agent_config_cache.pop(agent_name, None)
+        _invalidate_tools_cache(agent_name)
     else:
         _agent_config_cache.clear()
+        _tools_cache.clear()
+
+
+def _invalidate_tools_cache(agent_name: str) -> None:
+    """Drop ``_tools_cache`` entries whose key targets ``agent_name``.
+
+    Cache keys are shaped as
+    ``"<agent>:<user>:<tool_loading>:<tool_budget>[:<perms>]"``; keys
+    belonging to ``agent_name`` therefore share the ``"<agent>:"``
+    prefix. A full prefix match on ``"<agent>:"`` is enough — no need
+    to parse the rest of the key.
+    """
+    prefix = f"{agent_name}:"
+    stale = [k for k in _tools_cache if k.startswith(prefix)]
+    for k in stale:
+        _tools_cache.pop(k, None)
+    if stale:
+        logger.debug(
+            "Dropped %d stale tools_cache entries for agent %s",
+            len(stale),
+            agent_name,
+        )
 
 
 # Server category mapping (populated after provider refresh)
@@ -2527,11 +2556,17 @@ async def mcp_set_user_context(request: Request):
     except Exception:
         return api_error(400, "invalid json", "validation_error")
 
-    _agent_user_context[agent_name] = body.get("user_identity")
+    new_user = body.get("user_identity")
+    old_user = _agent_user_context.get(agent_name)
+    _agent_user_context[agent_name] = new_user
+    if old_user != new_user:
+        # Tools cache is keyed on (agent, effective_user, ...); an
+        # identity swap makes prior entries stale, so drop them.
+        _invalidate_tools_cache(agent_name)
     logger.debug(
         "user context set: agent=%s user=%s",
         agent_name,
-        body.get("user_identity"),
+        new_user,
     )
     return api_ok()
 
