@@ -85,6 +85,9 @@ async def start_oauth(request: Request, token: str):
     )
 
     request.session["oauth_state"] = state
+    # google-auth-oauthlib ≥1.3 enables PKCE by default — the verifier must
+    # survive to the callback, else Google rejects the exchange.
+    request.session["oauth_code_verifier"] = getattr(flow, "code_verifier", None)
     return RedirectResponse(url=auth_url)
 
 
@@ -150,8 +153,12 @@ async def oauth_callback(
 
     os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
+    code_verifier = request.session.pop("oauth_code_verifier", None)
+
     try:
         flow = get_flow(redirect_uri)
+        if code_verifier:
+            flow.code_verifier = code_verifier
         flow.fetch_token(code=code)
         credentials = flow.credentials
 
