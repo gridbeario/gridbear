@@ -202,8 +202,9 @@ tests/              Unit and integration tests
 
 ## Community
 
-- [Discord](https://discord.gg/WhTK4PPmaE) — chat, questions, and discussions
-- [GitHub Issues](https://github.com/gridbeario/gridbear/issues) — bug reports and feature requests
+- [Discord](https://discord.gg/WhTK4PPmaE) — chat and realtime Q&A
+- [GitHub Issues](https://github.com/gridbeario/gridbear/issues) — bug reports and concrete feature requests
+- [GitHub Discussions](https://github.com/gridbeario/gridbear/discussions) — design proposals, RFCs, general Q&A, and show-and-tell
 
 ## License
 
