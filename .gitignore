@@ -113,8 +113,10 @@ ui/static/avatars/
 !ui/static/logo.png
 !ui/static/icons/*.png
 
-# Local development scripts and docs
-docs/
+# Local development scripts (no longer ignoring docs/ — it hosts the
+# MkDocs site sources now; internal specs have moved to GitHub
+# Discussions under the RFC / Design category)
+site/
 scripts/migrate_chroma_to_pg.py
 scripts/migrate_encrypt_data.py
 claude-debate.sh

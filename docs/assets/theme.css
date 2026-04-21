@@ -1,0 +1,31 @@
+/* GridBear brand palette — teal primary, dark navy accent.
+   Overrides the Material "custom" palette slot declared in mkdocs.yml. */
+
+:root {
+  --md-primary-fg-color:         #3ECFB4;
+  --md-primary-fg-color--light:  #5ED8C1;
+  --md-primary-fg-color--dark:   #2FB39B;
+  --md-primary-bg-color:         #0D1B2A;
+  --md-primary-bg-color--light:  rgba(13, 27, 42, 0.7);
+
+  --md-accent-fg-color:          #0D1B2A;
+  --md-accent-fg-color--transparent: rgba(13, 27, 42, 0.1);
+  --md-accent-bg-color:          #ffffff;
+  --md-accent-bg-color--light:   #ffffff;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:         #3ECFB4;
+  --md-primary-fg-color--light:  #5ED8C1;
+  --md-primary-fg-color--dark:   #2FB39B;
+  --md-primary-bg-color:         #ffffff;
+  --md-primary-bg-color--light:  rgba(255, 255, 255, 0.7);
+
+  --md-accent-fg-color:          #5ED8C1;
+  --md-accent-fg-color--transparent: rgba(94, 216, 193, 0.15);
+  --md-accent-bg-color:          #0D1B2A;
+  --md-accent-bg-color--light:   #0D1B2A;
+
+  --md-default-bg-color:         #0D1B2A;
+  --md-default-bg-color--light:  rgba(13, 27, 42, 0.7);
+}
