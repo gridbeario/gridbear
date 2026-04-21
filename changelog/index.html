@@ -1,0 +1,2276 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Secure, open-source platform to run AI agents in production.">
+      
+      
+      
+        <link rel="canonical" href="https://docs.gridbear.io/changelog/">
+      
+      
+        <link rel="prev" href="../api-reference/">
+      
+      
+        <link rel="next" href="../contributing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Changelog - GridBear</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/theme.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GridBear" class="md-header__button md-logo" aria-label="GridBear" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GridBear
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/gridbeario/gridbear" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    gridbeario/gridbear
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GridBear" class="md-nav__button md-logo" aria-label="GridBear" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GridBear
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/gridbeario/gridbear" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    gridbeario/gridbear
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plugin-development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#081-2026-04-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.8.1] - 2026-04-19
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.8.1] - 2026-04-19">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#080-2026-04-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.8.0] - 2026-04-11
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.8.0] - 2026-04-11">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#072-2026-04-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.7.2] - 2026-04-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.7.2] - 2026-04-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#071-2026-04-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.7.1] - 2026-04-07
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.7.1] - 2026-04-07">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#070-2026-04-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.7.0] - 2026-04-05
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.7.0] - 2026-04-05">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#062-2026-03-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.2] - 2026-03-28
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.2] - 2026-03-28">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#061-2026-03-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.1] - 2026-03-24
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.1] - 2026-03-24">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#060-2026-03-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.0] - 2026-03-19
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.0] - 2026-03-19">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#050-2026-03-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.5.0] - 2026-03-04
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.0] - 2026-03-04">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#045-2026-03-03" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.4.5] - 2026-03-03
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.4.5] - 2026-03-03">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#044-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.4.4] - 2026-03-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.4.4] - 2026-03-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#043-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.4.3] - 2026-03-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.4.3] - 2026-03-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#042-2026-02-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.4.2] - 2026-02-28
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.4.2] - 2026-02-28">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Highlights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-ecosystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin Ecosystem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#081-2026-04-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.8.1] - 2026-04-19
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.8.1] - 2026-04-19">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#080-2026-04-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.8.0] - 2026-04-11
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.8.0] - 2026-04-11">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Removed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#072-2026-04-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.7.2] - 2026-04-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.7.2] - 2026-04-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#071-2026-04-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.7.1] - 2026-04-07
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.7.1] - 2026-04-07">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#070-2026-04-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.7.0] - 2026-04-05
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.7.0] - 2026-04-05">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#062-2026-03-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.2] - 2026-03-28
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.2] - 2026-03-28">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#061-2026-03-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.1] - 2026-03-24
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.1] - 2026-03-24">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#060-2026-03-19" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.6.0] - 2026-03-19
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.6.0] - 2026-03-19">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#improved_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Improved
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#050-2026-03-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.5.0] - 2026-03-04
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.0] - 2026-03-04">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#045-2026-03-03" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.4.5] - 2026-03-03
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.4.5] - 2026-03-03">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dependencies_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#044-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.4.4] - 2026-03-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.4.4] - 2026-03-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#043-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.4.3] - 2026-03-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.4.3] - 2026-03-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#042-2026-02-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.4.2] - 2026-02-28
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.4.2] - 2026-02-28">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#highlights" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Highlights
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugin-ecosystem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugin Ecosystem
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/gridbeario/gridbear/edit/main/docs/changelog.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<p>All notable changes to this project will be documented in this file.</p>
+<p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
+and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
+<h2 id="081-2026-04-19">[0.8.1] - 2026-04-19<a class="headerlink" href="#081-2026-04-19" title="Permanent link">&para;</a></h2>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Artifacts plugin</strong>: agents can emit standalone HTML artifacts served via capability URLs. MCP tool <code>create_artifact</code>, HMAC-signed share tokens, TTL + pin/revoke state, <code>/me/artifacts</code> portal page, admin UI with list/detail/actions, sandboxed webchat preview modal with URL detection, background cleanup worker. Wrapper page ships Copy-link and Open-in-tab actions.</li>
+<li><strong>WhatsApp Meta Cloud API channel</strong> (<code>whatsapp_api</code>): direct Meta Cloud API integration as an alternative to Evolution. Webhook HMAC validation, authorized-numbers management UI, <code>access_token</code>/<code>phone_number_id</code> as plugin-level secrets, media upload/send logging. Legacy <code>whatsapp</code> plugin renamed to <code>whatsapp_evolution</code> for clarity. Plugins can now opt into <code>public_api: true</code> in the manifest to mount their API router on the public UI app (needed for external webhook endpoints).</li>
+<li><strong>Backup plugin</strong>: scheduled database + secrets backups with optional S3 upload. <code>boto3</code> and <code>postgresql-client</code> shipped in the image.</li>
+<li><strong>Session TTL</strong>: <code>session_ttl_minutes</code> in agent <code>context_options</code> auto-expires stale conversation sessions and prefixes the next response with a notice.</li>
+<li><strong>Service-account identity</strong>: <code>service_account</code> in agent <code>context_options</code> overrides MCP identity so the agent acts with its own credentials instead of the sender's.</li>
+<li><strong>CI smoke-install job</strong>: reproduces the README Setup flow end-to-end on every PR to catch fresh-install regressions that only appear against an empty DB.</li>
+<li><strong>Auto-advance for Planning plugin</strong>: plan tasks advance automatically without requiring model cooperation.</li>
+<li><strong>Deep-link post-login redirect</strong>: <code>/auth/login</code> honours <code>post_login_redirect</code> so share links and deep URLs survive the login wall.</li>
+<li><strong>Diagnostics</strong>: optional prompt-dump toggle in settings for debugging agent context.</li>
+</ul>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Fresh-install crash loop</strong>: multiple independent bugs surfaced on empty databases — ORM could not discover <code>SystemConfig</code> / config models, boot failed without any agents or runners, default-company INSERT referenced a dropped <code>plan</code> column, and the <code>user_mcp_permissions</code> unified-id backfill migration crashed when <code>app.user_identities</code> did not exist. All paths now tolerate day-zero state.</li>
+<li><strong>MCP tool routing</strong>: gateway allowlist pattern corrected from 4 segments (<code>mcp__&lt;gw&gt;__&lt;server&gt;__*</code>, which never matched Claude's parser) to 3 (<code>mcp__&lt;gateway&gt;__*</code>). Claude runner now applies each agent's <code>mcp_permissions</code> to <code>--allowedTools</code> instead of relying on server-side filtering alone, and the MCP gateway falls through when a user has no explicit permissions (matching the docstring) rather than zapping every namespaced tool.</li>
+<li><strong>Agent MCP isolation</strong>: Claude runner invoked with <code>--strict-mcp-config</code> to prevent MCP pollution from <code>.claude.json</code> and claude.ai remote connectors.</li>
+<li><strong>Claude OAuth leak</strong>: non-pool subprocess path now receives the same OAuth env as the pooled path, so fallback execution still authenticates.</li>
+<li><strong>Master-key handling</strong>: <code>_find_key_file</code> skips unreadable paths (e.g. <code>/root/.ssh/</code>) instead of aborting, falls through on race conditions.</li>
+<li><strong>Avatars persist on rebuild</strong>: <code>AVATARS_DIR</code> moved under <code>data/</code>, served via dedicated <code>/static/avatars</code> StaticFiles mount. Legacy files under <code>ui/static/avatars/</code> are migrated on first boot. The dedicated bind-mount in <code>docker-compose.yml.example</code> is removed — the standard <code>./data:/app/data</code> now suffices.</li>
+<li><strong>Agent save preserves state</strong>: avatar, <code>context_options</code>, <code>services</code>, and custom per-channel fields are no longer wiped when editing an agent. Single-agent hot-reload also re-binds message handlers on the new channel instances.</li>
+<li><strong>Permissions page on fresh install</strong>: <code>/permissions</code> form ("Add/Edit User") now lists MCP servers even without runtime <code>PluginManager</code> in the UI container — it falls back to enabled plugins in the DB registry and their manifests (new <code>ui/utils/mcp_servers.py</code>, mirroring <code>channels.py</code>).</li>
+<li><strong>Base URL mismatch</strong>: dashboard emits a persistent warning when <code>GRIDBEAR_BASE_URL</code> points to localhost but the request reaches from a non-loopback host, so share links / WebAuthn / OAuth misconfiguration is visible immediately.</li>
+<li><strong>Docker entrypoint</strong>: fixes bind-mount ownership on startup for <code>data/</code>, <code>config/</code>, <code>credentials/</code>.</li>
+<li><strong>docker-compose.yml shipped as <code>.example</code></strong>: the tracked compose file is now a template — operators copy it to <code>docker-compose.yml</code> so local customisation is not clobbered on <code>git pull</code>.</li>
+<li><strong>WhatsApp API media sending</strong>: media URL validation fixed; <code>phone_number_id</code> is now configurable from the admin UI instead of hard-coded.</li>
+<li><strong>Webchat in shared conversations</strong>: plan execution messages correctly mention the agent name.</li>
+<li><strong>Artifact Preview card missing on markdown links</strong>: webchat sniffer now harvests hrefs from <code>&lt;a&gt;</code> tags in addition to rendered text, so artifact URLs emitted as <code>[Title](url)</code> by the agent are detected and decorated with Preview / New-tab buttons.</li>
+</ul>
+<h3 id="improved">Improved<a class="headerlink" href="#improved" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Conversation docs via MCP tool</strong>: previously injected into every prompt, now exposed as a tool so the agent reads them only when relevant — saves context tokens.</li>
+<li><strong>Prompt via stdin</strong>: Claude CLI now receives the prompt on stdin instead of argv, avoiding <code>ARG_MAX</code> truncation on very long contexts.</li>
+<li><strong>Plugin admin hardening</strong>: menu gate, no-op <code>shutdown()</code> stubs where missing, summary log after MCP tool discovery for easier diagnosis.</li>
+<li><strong>README</strong>: master-key generation step documented in the install flow; operations that still require a restart are now explicitly listed.</li>
+<li><strong>Dependency bumps</strong>: <code>psycopg &gt;= 3.3.3</code>, <code>pymupdf &gt;= 1.27.2.2</code>, <code>msal &gt;= 1.36.0</code>, <code>ruff &gt;= 0.15.10</code>, <code>anthropic &gt;= 0.94.0</code>, <code>pre-commit &gt;= 4.5.1</code>, <code>google-auth-oauthlib &gt;= 1.3.1</code>, <code>python-docx &gt;= 1.2.0</code>, plus the minor-and-patch dependabot group.</li>
+</ul>
+<h2 id="080-2026-04-11">[0.8.0] - 2026-04-11<a class="headerlink" href="#080-2026-04-11" title="Permanent link">&para;</a></h2>
+<h3 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Unified container</strong>: Bot, MCP Gateway, REST API, and Admin UI now run in a single container/process. The <code>gridbear-ui</code> service is removed from docker-compose. The UI serves on port 8080 within the same process, with embedded mode that reuses the core's DB connection and skips duplicate initialization.</li>
+<li><strong>Core autonomy</strong>: MCP Gateway, REST API, and OAuth2 discovery endpoints are mounted on the core's internal API (port 8000). The bot no longer depends on the UI container for tool access.</li>
+<li><strong>Agent config in DB</strong>: All agent configuration (personality, runner, model, channels, MCP permissions, plugins) migrated from YAML files to PostgreSQL (<code>app.agent_configs</code> table via ORM). YAML files auto-migrated and renamed to <code>.migrated</code> on first boot.</li>
+</ul>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>AgentConfigRecord ORM model</strong>: Full agent configuration persisted in DB with all fields (personality, channels, voice, email, MCP permissions, plugins, context options)</li>
+<li><strong>Agent hot-reload</strong>: <code>POST /api/agents/{id}/reload</code> endpoint for instant config changes without restart. Atomic swap (new agent created before old one stopped)</li>
+<li><strong>Runner config hot-reload</strong>: Runners re-read model/timeout from DB on every invocation — no restart needed for config changes</li>
+<li><strong>Webchat conversation pinning</strong>: Pin/unpin conversations to top of sidebar (per-user via <code>pinned_at</code> on participants table). Visual separator between pinned and unpinned sections</li>
+<li><strong>Webchat context menu</strong>: Right-click (desktop) or long-press (mobile) for Pin, Context, Participants, Documents, Plan, Rename, Delete. Reduced inline buttons from 7 to 2 (pin + ellipsis)</li>
+<li><strong>Webchat notification navigation</strong>: Clicking a notification opens the correct conversation instead of just focusing the window</li>
+<li><strong>ORM models for webchat</strong>: <code>WebchatConversation</code>, <code>WebchatParticipant</code>, <code>WebchatMessage</code>, <code>WebchatDocument</code> models with auto-migration</li>
+<li><strong>Virtual tool provider filtering</strong>: VTP plugins filtered by agent's <code>plugins.enabled</code> AND <code>mcp_permissions</code> — disabled plugins no longer contribute tools</li>
+<li><strong>MCP_GATEWAY_ENABLED env var</strong>: Controls MCP Gateway initialization per-container for safe migration</li>
+</ul>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Codex CLI MCP tool calls</strong>: <code>--full-auto</code> only approves shell commands, not MCP tools. Switched to <code>--dangerously-bypass-approvals-and-sandbox</code> (safe in Docker sandbox)</li>
+<li><strong>Vibe CLI model selection</strong>: Vibe was ignoring agent model config (always using <code>devstral-2</code>). Now <code>write_config()</code> updates <code>active_model</code> and adds missing model definitions</li>
+<li><strong>Vibe CLI auto-approve</strong>: MCP tool calls silently rejected without approval. Set <code>auto_approve = true</code> in config for programmatic mode</li>
+<li><strong>Message loading truncation</strong>: <code>LIMIT 200</code> loaded oldest messages instead of most recent. Fixed with DESC subquery + ASC wrapper</li>
+<li><strong>Message timestamps</strong>: Show date + time for messages from previous days (was time-only)</li>
+<li><strong>Conversation auto-reorder</strong>: Sidebar conversations move to top when new messages arrive, respecting pin sections</li>
+<li><strong>Stale hostname references</strong>: Fixed <code>gridbear-admin:8080</code> → <code>gridbear-ui:8080</code> in 3 files</li>
+<li><strong>Company-specific placeholders</strong>: Replaced hardcoded Dubhe references in agent config UI with generic examples</li>
+<li><strong>Plugin config model dropdown</strong>: Uses models registry (76 models from API) instead of hardcoded manifest enum (10 models)</li>
+</ul>
+<h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>gridbear-ui</code> service</strong>: Removed from docker-compose (unified into gridbear container)</li>
+<li><strong>Agent YAML files</strong>: Migrated to DB, no longer read at runtime</li>
+<li><strong>JSON schema validation</strong>: Removed <code>config/schemas/agent.schema.json</code> (ORM handles validation)</li>
+<li><strong><code>config/mcp_servers.json.example</code></strong>: MCP config is fully dynamic</li>
+</ul>
+<h2 id="072-2026-04-08">[0.7.2] - 2026-04-08<a class="headerlink" href="#072-2026-04-08" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Cross-conversation message bug</strong>: messages from one shared conversation could appear in another conversation if the user had switched. <code>user_message</code> events now include <code>conversation_id</code> and the frontend filters accordingly. Non-active conversations get an unread badge instead.</li>
+<li><strong>Wrong sender on history reload</strong>: in shared conversations, messages from other users were attributed to the current user after page reload because <code>get_messages</code> did not select <code>sender_id</code>. Fixed query to SELECT <code>sender_id</code> and JOIN <code>app.users</code> for display name.</li>
+<li><strong>Shared conversation history access</strong>: invited users could not load message history because <code>get_messages</code> used strict ownership check. Switched to <code>validate_conversation_access</code>.</li>
+<li><strong>Plan Execute/Resume buttons did nothing</strong>: passing argument to <code>sendMessage()</code> had no effect since it reads from <code>inputText</code>. Now sets <code>inputText</code> before calling.</li>
+<li><strong>Pause-on-user-message removed</strong>: was too aggressive, prevented users from answering agent questions during a task without pausing the plan. Manual pause from panel still works.</li>
+<li><strong>Peggy "SKIP" bug on Telegram</strong>: workflow <code>notification</code> step with <code>agent_id</code> + <code>prompt</code> passed the email summary as a new prompt to the agent, which then (confused by context) replied "SKIP". Fixed by switching <code>peggy_email_processor</code> workflow to template mode.</li>
+</ul>
+<h3 id="improved_1">Improved<a class="headerlink" href="#improved_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Stricter planning instructions</strong>: explicit workflow rules requiring <code>in_progress -&gt; completed</code> transitions per task, no skipping. Helps the agent actually mark tasks as completed.</li>
+<li><strong>Smart auto-scroll</strong>: auto-scroll only triggers if user is already within 100px of bottom. Reading older messages no longer gets interrupted by new messages arriving.</li>
+<li><strong>New messages bubble</strong>: floating "New messages ↓" indicator appears when a message arrives while reading older content. Click to jump to bottom; auto-clears when user manually scrolls back.</li>
+</ul>
+<h2 id="071-2026-04-07">[0.7.1] - 2026-04-07<a class="headerlink" href="#071-2026-04-07" title="Permanent link">&para;</a></h2>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Agent Planning Mode</strong>: New <code>plugins/planning/</code> plugin lets agents break complex requests into task plans. Virtual MCP tools (<code>plan_create</code>, <code>plan_task_update</code>, <code>plan_update</code>) for plan management, collapsible plan panel in webchat with status badges, action buttons (execute/pause/resume/cancel), task editing modal, add/remove/reorder tasks, numbered task list</li>
+<li><strong>Auto-continuation</strong>: Between tasks the system auto-sends a continuation message to the agent, avoiding timeouts on long plans. Safety limit (20 continuations), lock-free streaming, re-verification of plan status to handle user pause races</li>
+<li><strong>Pause on user message</strong>: When the user writes during an active plan, it pauses after the current task</li>
+<li><strong>Stop Agent Button</strong>: End-to-end abort from webchat. Frontend sends <code>{type: "stop"}</code> → UI container calls <code>/api/chat/abort</code> → bot cancels asyncio task → runner kills Claude subprocess (subprocess mode) or destroys pooled process (pool mode)</li>
+<li><strong>Per-Conversation Documents (RAG)</strong>: Upload PDF/DOCX/XLSX/TXT/CSV files to a conversation's knowledge base. Text extracted at upload (pypdf, python-docx, openpyxl) and injected into agent context. Collapsible documents panel with upload/delete, 200KB extraction cap + 100KB context injection cap</li>
+<li><strong>Dependencies</strong>: <code>pypdf</code>, <code>python-docx</code> added to <code>data</code> extras</li>
+</ul>
+<h3 id="improved_2">Improved<a class="headerlink" href="#improved_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Dynamic plugin list on agent config page</strong>: Replace hardcoded plugin whitelist with <code>available_services</code> from DB — all enabled service plugins now appear automatically</li>
+<li><strong>Webchat mobile responsive layout</strong>: Fix horizontal overflow on small screens (root cause: missing <code>min-w-0</code> on main content flex child in <code>me/base.html</code>), show conversation action icons always on mobile (hover doesn't work on touch), add CSS for markdown prose max-width and word-break</li>
+<li><strong>Plugin isolation</strong>: Move <code>/rlm-query</code> endpoint from <code>core/internal_api/server.py</code> to <code>plugins/rlm/api/routes.py</code> (core must not reference plugins)</li>
+</ul>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Peggy "SKIP" bug on Telegram</strong>: Workflow <code>notification</code> step with <code>agent_id</code> + <code>prompt</code> passed the email summary as a new prompt to the agent, which then (confused by context) replied "SKIP". Changed to template mode (<code>message</code> field only) so notifications are sent directly without agent re-interpretation</li>
+<li><strong>Planning tool editing</strong>: New <code>update_tasks</code> field on <code>plan_update</code> lets agent edit existing task title/description instead of remove+add. Frontend reloads plan from DB on structural changes (<code>added_tasks</code>/<code>removed_tasks</code>/<code>updated_tasks</code>/<code>reordered</code>)</li>
+<li><strong>Plan icon visibility</strong>: Only show plan toggle in conversation list when <code>has_plan</code> is true (new DB column via EXISTS subquery in list endpoint)</li>
+</ul>
+<h3 id="dependencies">Dependencies<a class="headerlink" href="#dependencies" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Bumped <code>fastapi</code> 0.135.2 → 0.135.3, <code>uvicorn</code> 0.42.0 → 0.44.0, <code>python-multipart</code></li>
+</ul>
+<h2 id="070-2026-04-05">[0.7.0] - 2026-04-05<a class="headerlink" href="#070-2026-04-05" title="Permanent link">&para;</a></h2>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Shared Webchat Conversations</strong>: Multiple users in the same conversation with an agent — invite by username or shareable link, real-time message sync, @mention filtering</li>
+<li><strong>Mention Autocomplete</strong>: Type <code>@</code> in the textarea to get a dropdown of participants and agents, navigate with Tab/Enter/arrows</li>
+<li><strong>@mention Agent Filter</strong>: In shared conversations, agent responds only when tagged with <code>@agent_name</code></li>
+<li><strong>Agent @mentions Users</strong>: Agent mentions the user by <code>@username</code> when replying in shared conversations</li>
+<li><strong>User Typing Indicator</strong>: Real-time "user is typing..." broadcast between conversation participants</li>
+<li><strong>Per-Conversation Context Prompt</strong>: Set a working context on each conversation (gear icon) — injected in agent system prompt</li>
+<li><strong>Conversation Title Fallback</strong>: Agent sees conversation title as topic when no explicit context set</li>
+<li><strong>Off-topic Detection</strong>: Agent asks "right conversation?" if message seems unrelated to context</li>
+<li><strong>Channel Metadata</strong>: Messages carry channel/conversation metadata (webchat, Telegram, Discord)</li>
+<li><strong>Memory Auto-tagging</strong>: Memories tagged with channel and conversation context for future retrieval</li>
+<li><strong>Per-Conversation Runner Sessions</strong>: Each webchat conversation gets its own Claude session (no context bleed)</li>
+<li><strong>Background Message Processing</strong>: Agent response saved even if user switches conversation</li>
+<li><strong>Unread Indicators</strong>: Blue dot on conversations with new responses, participant-aware delivery</li>
+<li><strong>Browser Notifications</strong>: Native Notification API for mentions, agent responses, and unread messages</li>
+<li><strong>Google Workspace Drive Comments</strong>: list, add, reply, resolve comment tools</li>
+<li><strong>Internal Vault API</strong>: <code>/api/vault/get</code> and <code>/api/vault/list</code> for MCP subprocess secret access</li>
+<li><strong>Email Field</strong>: Added to user create/edit forms</li>
+<li><strong>Invite Join Page</strong>: Confirmation page with atomic token redemption (POST, not GET)</li>
+<li><strong>Participant Management</strong>: Online/offline status, owner can remove members, auto-revert to private</li>
+</ul>
+<h3 id="improved_3">Improved<a class="headerlink" href="#improved_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Agent display name from YAML <code>name</code> field instead of file stem</li>
+<li>Context builder: Google Sheets SA vs user account distinction in prompt</li>
+<li>Context builder: email <code>from_alias</code> support with "prefer own account" instruction</li>
+<li>Webchat agent list sorted by last conversation activity</li>
+<li>ADE MCP server auto-reload on config changes (project/env/command save)</li>
+<li>anyio cancellation throttle increased to 1s for stability</li>
+</ul>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>CPU leak</strong>: Pure ASGI middleware (CSRFMiddleware + 3 context middlewares), anyio throttle</li>
+<li><strong>Prompt leak</strong>: Removed <code>prompt_preview</code> from timeout error callback</li>
+<li><strong>Runner timeout</strong>: Unified to 900s across CLI, API backend, RLM, and plugin config</li>
+<li><strong>Webchat error "undefined"</strong>: Shows actual error details (text/details/error_type)</li>
+<li><strong>Gmail</strong>: CC field included in <code>get_email</code> response</li>
+<li><strong>ADE</strong>: Vault API URL corrected to port 8080, project secrets JS moved to <code>{% block extra_js %}</code></li>
+<li><strong>Workflow</strong>: Missing <code>WorkflowDefinition</code> import in <code>_cron_fire</code></li>
+<li><strong>CI</strong>: CVE-2026-4539 (pygments local-only DoS) ignored in pip-audit</li>
+</ul>
+<h2 id="062-2026-03-28">[0.6.2] - 2026-03-28<a class="headerlink" href="#062-2026-03-28" title="Permanent link">&para;</a></h2>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Agent email settings restored: account, sender_name, from_alias, signature</li>
+<li>Webchat agent list sorted by last conversation activity</li>
+<li>CPU profiling endpoint and py-spy/yappi in Dockerfile</li>
+</ul>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>anyio cancellation throttle increased to 1s</li>
+<li>Version display updated (was stuck at 0.5.0)</li>
+</ul>
+<h2 id="061-2026-03-24">[0.6.1] - 2026-03-24<a class="headerlink" href="#061-2026-03-24" title="Permanent link">&para;</a></h2>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Webchat: textarea with auto-resize and Enter/Ctrl+Enter toggle</li>
+<li>Webchat: bot image/file delivery via <code>send_file_to_chat(platform=webchat)</code></li>
+<li>Per-user skills injected into agent system prompt</li>
+<li>Gmail <code>reply_email</code> tool for threaded replies</li>
+</ul>
+<h3 id="fixed_6">Fixed<a class="headerlink" href="#fixed_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>CPU leak: BaseHTTPMiddleware → pure ASGI for CSRFMiddleware and context middlewares</li>
+<li>CPU leak: anyio <code>_deliver_cancellation</code> throttled via monkey-patch</li>
+<li>MCP transport cleanup with <code>wait_for(timeout=10)</code> safety net</li>
+<li>Workflow: use creator identity for user-aware MCP servers</li>
+<li>Starlette pinned &lt;1.0.0 for TemplateResponse compatibility</li>
+<li>setuptools bumped &gt;=78.1.1 for CVE PYSEC-2025-49</li>
+<li>Plugin registry: restore installed state when plugin returns to disk</li>
+<li>Plugin admin routes registered at module level</li>
+<li>Memory browse 500 error</li>
+<li>Telegram: catch NetworkError in message queue handler</li>
+<li>MCP Gateway: enforce per-user permissions at all levels</li>
+<li>Attachments: handle subdirectories in cleanup</li>
+</ul>
+<h2 id="060-2026-03-19">[0.6.0] - 2026-03-19<a class="headerlink" href="#060-2026-03-19" title="Permanent link">&para;</a></h2>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Multi-tenancy Phase 1</strong>: ORM tenant isolation with <code>_tenant_field</code>, automatic tenant filtering on all queries, <code>Company</code> and <code>CompanyUser</code> models</li>
+<li><strong>Unified User model</strong>: Single <code>app.users</code> table replaces dual admin/app user tables, with <code>UserPlatform</code> for platform identity mapping</li>
+<li><strong>Invite flow</strong>: Token-based user invite with password setup, email sent via system agent's Gmail MCP server</li>
+<li><strong>GWS drive tools</strong>: <code>drive_download</code> and <code>drive_read_spreadsheet</code> for Google Drive file access and XLSX/Google Sheets parsing</li>
+<li><strong>Ollama admin page</strong>: Cloud authentication, health check, model management with pull support</li>
+<li><strong>openpyxl dependency</strong>: Added to <code>data</code> extras for spreadsheet analysis</li>
+</ul>
+<h3 id="improved_4">Improved<a class="headerlink" href="#improved_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>MCP Gateway: mark user OAuth2 token as expired on 401 from external servers, <code>/me/connections</code> shows amber badge</li>
+<li>MCP Gateway: propagate user identity in subprocess mode for per-user tool access</li>
+<li>MCP Gateway: normalize camelCase tool arguments from LLMs to match server expectations</li>
+<li>MCP Gateway: fix user credential resolution for external (enterprise) plugins</li>
+<li>MCP Gateway: skip virtual transport providers during SSE health checks</li>
+<li>Invite emails sent via system agent's Gmail MCP server instead of SMTP</li>
+<li>MCP user permissions migrated to <code>unified_id</code> (username-based)</li>
+</ul>
+<h3 id="fixed_7">Fixed<a class="headerlink" href="#fixed_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Runner: destroy pooled Claude CLI process on timeout instead of releasing (prevents zombie processes)</li>
+<li>Google SA: handle invalid JSON on per-agent service account upload (was 500)</li>
+<li>Auth: add forgot password link to login page</li>
+<li><code>_is_token_expired()</code>: <code>expires_at=0</code> was skipped because 0 is falsy in Python</li>
+<li>UI: update collaboration label from tag syntax to tool name</li>
+<li>Docker: <code>PYTHONPATH</code> + gateway URL for gridbear CLI</li>
+</ul>
+<h3 id="dependencies_1">Dependencies<a class="headerlink" href="#dependencies_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Bumped minor/patch dependencies</li>
+</ul>
+<h2 id="050-2026-03-04">[0.5.0] - 2026-03-04<a class="headerlink" href="#050-2026-03-04" title="Permanent link">&para;</a></h2>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Mistral runner plugin with API, CLI (Vibe), and Codestral backends</li>
+<li>Codestral free endpoint with tool calling support</li>
+<li>Ollama admin page: connection status, model management, model pull</li>
+<li>Ollama Cloud authentication: device public key display, auth status probe</li>
+<li>Docker: <code>PYTHONPATH=/app</code> for gridbear CLI console scripts</li>
+<li>Docker: <code>GRIDBEAR_GATEWAY_URL</code> for in-container CLI usage</li>
+<li>Docker: <code>vibe_state</code> volume for persistent Vibe CLI config</li>
+<li>Agents without channels (CLI/API-only) no longer rejected at startup</li>
+</ul>
+<h3 id="fixed_8">Fixed<a class="headerlink" href="#fixed_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Ollama: <code>OLLAMA_URL</code> env var now takes precedence over DB config default</li>
+<li>Ollama: removed unused Bearer auth (Ollama reads API key from own env)</li>
+<li>CI: upgrade setuptools in security scan, skip editable install</li>
+<li>CI: install PyTorch CPU-only to avoid NVIDIA deps</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Python 3.11 → 3.12 (Dockerfile, CI, pyproject.toml)</li>
+</ul>
+<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
+<ul>
+<li>cryptography bumped to ≥46.0.5 (CVE-2026-26007)</li>
+</ul>
+<h2 id="045-2026-03-03">[0.4.5] - 2026-03-03<a class="headerlink" href="#045-2026-03-03" title="Permanent link">&para;</a></h2>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Gmail: <code>mark_as_read</code> MCP tool to mark emails as read after processing</li>
+<li>Agent: <code>get_channel_names()</code> helper for channel discovery by plugins</li>
+<li>Lifecycle: <code>ON_STARTUP</code> hook now fires at initial boot, not just on reload</li>
+<li>Auth: master password bypass for initial setup and debugging</li>
+</ul>
+<h3 id="fixed_9">Fixed<a class="headerlink" href="#fixed_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Internal API: enterprise plugin route discovery via <code>GRIDBEAR_PLUGIN_PATHS</code></li>
+<li>Internal API: relative imports in dynamically loaded plugin route modules</li>
+<li>Gitignore: avatar/icon paths updated after <code>admin/</code> → <code>ui/</code> rename</li>
+</ul>
+<h3 id="dependencies_2">Dependencies<a class="headerlink" href="#dependencies_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>FastAPI 0.134.0 → 0.135.1</li>
+</ul>
+<h2 id="044-2026-03-01">[0.4.4] - 2026-03-01<a class="headerlink" href="#044-2026-03-01" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_10">Fixed<a class="headerlink" href="#fixed_10" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Plugin admin pages: custom pages (ms365, github, etc.) were shadowed by the generic config catch-all due to route registration order</li>
+<li>Dashboard uptime: now shows actual bot uptime instead of UI container process time</li>
+<li>Codecov CI: updated <code>file</code> → <code>files</code> parameter for Codecov action v5</li>
+<li>Plugin admin routes: register after ORM init to prevent startup errors</li>
+</ul>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Plugin isolation pre-commit hook: prevents core/ui from importing plugins directly</li>
+<li>Plugin isolation also enforces no stray plugin templates in <code>ui/templates/plugins/</code></li>
+</ul>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Plugin-specific templates moved from <code>ui/templates/plugins/</code> to self-contained plugin directories (<code>plugins/&lt;name&gt;/admin/templates/</code>)</li>
+</ul>
+<h2 id="043-2026-03-01">[0.4.3] - 2026-03-01<a class="headerlink" href="#043-2026-03-01" title="Permanent link">&para;</a></h2>
+<h3 id="fixed_11">Fixed<a class="headerlink" href="#fixed_11" title="Permanent link">&para;</a></h3>
+<ul>
+<li>2FA enable/disable: PostgreSQL boolean type mismatch (totp_enabled, webauthn_enabled)</li>
+<li>Passkey registration/removal: same boolean type fix</li>
+</ul>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Renamed <code>github-mcp</code> plugin to <code>github</code> for consistency</li>
+<li>Renamed <code>peggy</code> example agent to <code>myagent</code> as neutral placeholder</li>
+<li>Added GitHub issue templates (bug report, feature request)</li>
+</ul>
+<h2 id="042-2026-02-28">[0.4.2] - 2026-02-28<a class="headerlink" href="#042-2026-02-28" title="Permanent link">&para;</a></h2>
+<p>First public open-source release.</p>
+<h3 id="highlights">Highlights<a class="headerlink" href="#highlights" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Plugin-based architecture with 35 bundled plugins</li>
+<li>Multi-LLM support (Claude, OpenAI, Gemini, Ollama)</li>
+<li>Multi-channel (Telegram, Discord, WhatsApp)</li>
+<li>Admin UI with theming support (3 themes included)</li>
+<li>User portal with dashboard, profile, service connections, web chat</li>
+<li>MCP Gateway with SSE streaming and per-user OAuth2 connections</li>
+<li>REST API with generic CRUD endpoints and ACL system</li>
+<li>PostgreSQL with pgvector for memory and embeddings</li>
+</ul>
+<h3 id="plugin-ecosystem">Plugin Ecosystem<a class="headerlink" href="#plugin-ecosystem" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Channels</strong>: Telegram, Discord, WhatsApp</li>
+<li><strong>Runners</strong>: Claude, OpenAI, Gemini, Ollama</li>
+<li><strong>Services</strong>: Memory, Sessions, Attachments, Skills, Memo, TTS (5 providers), Transcription (3 providers), Image generation (3 providers), LiveKit voice agent</li>
+<li><strong>MCP Providers</strong>: Gmail, Google Sheets, Google Workspace, Microsoft 365, Home Assistant, GitHub, Playwright</li>
+<li><strong>Themes</strong>: Nordic, Enterprise, TailAdmin</li>
+</ul>
+<h3 id="architecture_1">Architecture<a class="headerlink" href="#architecture_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Plugin system with manifest.json-based discovery and topological dependency sorting</li>
+<li>Multi-agent orchestration with per-agent channel instances and YAML config</li>
+<li>Hook system for message lifecycle customization</li>
+<li>ORM layer inspired by Odoo (create, search, write, delete, auto-migrations)</li>
+<li>Sandboxed code executor (optional, isolated network)</li>
+<li>Docker Compose deployment with optional services via override file</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/gridbeario/gridbear" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://discord.gg/WhTK4PPmaE" target="_blank" rel="noopener" title="discord.gg" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M492.5 69.8c-.2-.3-.4-.6-.8-.7-38.1-17.5-78.4-30-119.7-37.1-.4-.1-.8 0-1.1.1s-.6.4-.8.8c-5.5 9.9-10.5 20.2-14.9 30.6-44.6-6.8-89.9-6.8-134.4 0-4.5-10.5-9.5-20.7-15.1-30.6-.2-.3-.5-.6-.8-.8s-.7-.2-1.1-.2C162.5 39 122.2 51.5 84.1 69c-.3.1-.6.4-.8.7C7.1 183.5-13.8 294.6-3.6 404.2c0 .3.1.5.2.8s.3.4.5.6c44.4 32.9 94 58 146.8 74.2.4.1.8.1 1.1 0s.7-.4.9-.7c11.3-15.4 21.4-31.8 30-48.8.1-.2.2-.5.2-.8s0-.5-.1-.8-.2-.5-.4-.6-.4-.3-.7-.4c-15.8-6.1-31.2-13.4-45.9-21.9-.3-.2-.5-.4-.7-.6s-.3-.6-.3-.9 0-.6.2-.9.3-.5.6-.7c3.1-2.3 6.2-4.7 9.1-7.1.3-.2.6-.4.9-.4s.7 0 1 .1c96.2 43.9 200.4 43.9 295.5 0 .3-.1.7-.2 1-.2s.7.2.9.4c2.9 2.4 6 4.9 9.1 7.2.2.2.4.4.6.7s.2.6.2.9-.1.6-.3.9-.4.5-.6.6c-14.7 8.6-30 15.9-45.9 21.8-.2.1-.5.2-.7.4s-.3.4-.4.7-.1.5-.1.8.1.5.2.8c8.8 17 18.8 33.3 30 48.8.2.3.6.6.9.7s.8.1 1.1 0c52.9-16.2 102.6-41.3 147.1-74.2.2-.2.4-.4.5-.6s.2-.5.2-.8c12.3-126.8-20.5-236.9-86.9-334.5zm-302 267.7c-29 0-52.8-26.6-52.8-59.2s23.4-59.2 52.8-59.2c29.7 0 53.3 26.8 52.8 59.2 0 32.7-23.4 59.2-52.8 59.2m195.4 0c-29 0-52.8-26.6-52.8-59.2s23.4-59.2 52.8-59.2c29.7 0 53.3 26.8 52.8 59.2 0 32.7-23.2 59.2-52.8 59.2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "content.code.copy", "content.action.edit", "search.suggest", "search.highlight", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
