@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+
+- **Sandboxed code executor container**: the optional `gridbear-executor` service (opt-in via `docker-compose.override.yml.example`) has been removed together with the `executor/` image sources, the `EXECUTOR_TOKEN` and `DOCKER_GID` env vars, and the `executor-internal` network. It had no in-tree consumers; operators who were relying on it can keep running the old image from a fork or an out-of-tree override.
+
 ## [0.8.1] - 2026-04-19
 
 ### Added

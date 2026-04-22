@@ -58,7 +58,6 @@ Plugin-based multi-channel AI assistant framework. Connect multiple LLM runners 
 | `gridbear` | Bot runtime: agents, message processing, runners | 8000 (internal) |
 | `gridbear-ui` | Admin UI, MCP Gateway, REST API, User Portal | 8088 → 8080 |
 | `gridbear-postgres` | PostgreSQL 17 with pgvector | 5432 |
-| `gridbear-executor` | Sandboxed code execution (no internet) | 8090 (internal) |
 | `gridbear-evolution` | WhatsApp gateway (Evolution API) | 8082 → 8080 |
 
 ## Quick Start
@@ -79,7 +78,7 @@ cd gridbear
 cp .env.example .env
 cp docker-compose.yml.example docker-compose.yml
 
-# Optional: enable extra services (executor, WhatsApp, Ollama, n8n)
+# Optional: enable extra services (WhatsApp, Ollama, n8n)
 cp docker-compose.override.yml.example docker-compose.override.yml
 
 # Generate required secrets
@@ -195,7 +194,6 @@ core/               Core framework (plugin manager, hooks, database, ORM, MCP ga
 ui/                 Admin UI + User Portal (FastAPI + Jinja2 + Tailwind)
 plugins/            All plugins (channels, services, runners, MCP providers)
 config/             Configuration files (gitignored, .example templates provided)
-executor/           Sandboxed code execution container
 scripts/            Database init and maintenance scripts
 tests/              Unit and integration tests
 ```

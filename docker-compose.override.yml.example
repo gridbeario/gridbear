@@ -11,9 +11,6 @@ services:
       - ./plugins:/projects/gridbear-plugins:rw
     environment:
       - OLLAMA_URL=http://gridbear-ollama:11434
-    networks:
-      # Connect to executor isolated network
-      - executor-internal
 
   ui:
     init: true
@@ -29,38 +26,6 @@ services:
       --reload-exclude '.pytest_cache'
       --reload-exclude 'data/*'
       --timeout-graceful-shutdown 5
-
-  # Sandboxed code execution (no internet access)
-  executor:
-    build: ./executor
-    container_name: gridbear-executor
-    restart: unless-stopped
-    group_add:
-      - "${DOCKER_GID:-983}"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./config/executor.json:/app/config/executor.json:ro
-      - ./data/executor_audit:/app/data/audit
-    environment:
-      - EXECUTOR_AUTH_TOKEN=${EXECUTOR_TOKEN:-}
-    networks:
-      - executor-internal
-    expose:
-      - "8090"
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp:size=50M,mode=1777
-    mem_limit: 256m
-    cpus: 0.5
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   # WhatsApp gateway (Evolution API)
   evolution-redis:
@@ -168,11 +133,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
-networks:
-  executor-internal:
-    driver: bridge
-    internal: true
 
 volumes:
   ollama_data:
