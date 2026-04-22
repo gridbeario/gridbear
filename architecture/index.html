@@ -721,18 +721,13 @@
 <td>5432</td>
 </tr>
 <tr>
-<td><code>gridbear-executor</code></td>
-<td>Sandboxed code execution container (no internet)</td>
-<td>8090 internal</td>
-</tr>
-<tr>
 <td><code>gridbear-evolution</code></td>
 <td>Optional WhatsApp gateway (Evolution API)</td>
 <td>8082 → 8080</td>
 </tr>
 </tbody>
 </table>
-<p>The sandboxed executor and WhatsApp gateway are opt-in, enabled by copying <code>docker-compose.override.yml.example</code> and uncommenting the relevant blocks.</p>
+<p>Optional services (WhatsApp gateway, Ollama, n8n) are opt-in, enabled by copying <code>docker-compose.override.yml.example</code> and uncommenting the relevant blocks.</p>
 <h2 id="plugin-system">Plugin system<a class="headerlink" href="#plugin-system" title="Permanent link">&para;</a></h2>
 <p>Plugins live under <code>plugins/</code> in the main repo, or under any extra directory listed in the <code>GRIDBEAR_PLUGIN_PATHS</code> env var (comma-separated). Each plugin ships a <code>manifest.json</code> with:</p>
 <ul>
