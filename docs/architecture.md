@@ -8,10 +8,9 @@ GridBear is a plugin-based framework. A single container (`gridbear`) hosts the 
 |---|---|---|
 | `gridbear` | Bot runtime, admin UI, MCP gateway, REST API | 8000 internal / 8080 UI (`8088` on the host by default) |
 | `gridbear-postgres` | PostgreSQL 17 with the `pgvector` extension | 5432 |
-| `gridbear-executor` | Sandboxed code execution container (no internet) | 8090 internal |
 | `gridbear-evolution` | Optional WhatsApp gateway (Evolution API) | 8082 → 8080 |
 
-The sandboxed executor and WhatsApp gateway are opt-in, enabled by copying `docker-compose.override.yml.example` and uncommenting the relevant blocks.
+Optional services (WhatsApp gateway, Ollama, n8n) are opt-in, enabled by copying `docker-compose.override.yml.example` and uncommenting the relevant blocks.
 
 ## Plugin system
 

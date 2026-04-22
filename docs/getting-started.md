@@ -51,7 +51,7 @@ docker exec gridbear python3 -c \
 
 ## Optional extras
 
-Copy the override template to enable extra services (sandboxed code executor, WhatsApp via Evolution API, local Ollama, n8n):
+Copy the override template to enable extra services (WhatsApp via Evolution API, local Ollama, n8n):
 
 ```bash
 cp docker-compose.override.yml.example docker-compose.override.yml
