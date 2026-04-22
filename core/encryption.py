@@ -16,12 +16,17 @@ _logger = logging.getLogger(__name__)
 
 # Key search paths — same as ui/secrets_manager.py (no import dependency on ui/)
 _BASE_DIR = Path(__file__).resolve().parent.parent
+# Candidate key file locations, in preference order. The dedicated
+# `config/secrets.key` wins; the home-dir SSH paths stay for operators
+# who were already relying on that fallback. The previous hard-coded
+# `/root/.ssh/*` entries were dropped — the container should never run
+# as root in the first place, and if it does, silently consuming a
+# root-owned SSH key as the vault master key is a surprise bomb
+# (different host → different key → vault unreadable).
 KEY_PATHS = [
     _BASE_DIR / "config" / "secrets.key",
     Path.home() / ".ssh" / "id_ed25519",
     Path.home() / ".ssh" / "id_rsa",
-    Path("/root/.ssh/id_ed25519"),
-    Path("/root/.ssh/id_rsa"),
     Path("/app/config/secrets.key"),
 ]
 MASTER_KEY_ENV = "GRIDBEAR_MASTER_KEY"
@@ -73,11 +78,36 @@ def _get_key() -> bytes:
     env_val = os.environ.get(MASTER_KEY_ENV)
     if env_val:
         _cached_key = hashlib.sha256(env_val.encode()).digest()
+        # Purge the env var once cached so child processes (plugin
+        # subprocesses, Claude CLI, Playwright, MCP stdio servers)
+        # can't `os.environ[MASTER_KEY_ENV]` to pull the plaintext
+        # master key out of /proc/<pid>/environ.
+        os.environ.pop(MASTER_KEY_ENV, None)
         return _cached_key
 
     raise RuntimeError(
         "No encryption key found. Create config/secrets.key or set GRIDBEAR_MASTER_KEY."
     )
+
+
+def ensure_master_key_loaded() -> None:
+    """Force master-key derivation and purge ``GRIDBEAR_MASTER_KEY`` from env.
+
+    Call eagerly during app startup, before any plugin subprocess is
+    spawned. Two guarantees after the call returns:
+
+    1. The cached key is derived (from file if present, else env var),
+       so later encrypt/decrypt calls are purely file-free.
+    2. ``GRIDBEAR_MASTER_KEY`` is removed from ``os.environ`` regardless
+       of which source actually fed the cache, so any subprocess
+       launched afterwards (Claude CLI, Playwright, MCP stdio servers)
+       cannot read the plaintext master key out of
+       ``/proc/<pid>/environ``.
+
+    Safe to call multiple times — ``_get_key`` is cached.
+    """
+    _get_key()
+    os.environ.pop(MASTER_KEY_ENV, None)
 
 
 def encrypt(plaintext: str) -> str:

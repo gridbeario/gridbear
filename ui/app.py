@@ -33,7 +33,21 @@ def _throttled_deliver_cancellation(self, origin):
 _anyio_asyncio.CancelScope._deliver_cancellation = _throttled_deliver_cancellation
 # ────────────────────────────────────────────────────────────────────
 from core.__version__ import __version__
+from core.encryption import ensure_master_key_loaded
 from core.mcp_gateway.server import router as mcp_gateway_router
+
+# Derive the master key once, at import time, so that
+# GRIDBEAR_MASTER_KEY is purged from os.environ before any plugin
+# subprocess (Claude CLI, Playwright, MCP stdio servers) is spawned
+# and would otherwise inherit it via /proc/<pid>/environ. A fresh
+# install (no key file, no env var) logs and continues — the first
+# call to encrypt/decrypt later will raise explicitly.
+try:
+    ensure_master_key_loaded()
+except RuntimeError:
+    logger.info(
+        "ui: master key not configured yet (fresh install) — will derive on first use"
+    )
 from core.oauth2.discovery import router as oauth2_discovery_router
 from core.oauth2.server import router as oauth2_server_router
 from core.oauth2.server import set_db as set_oauth2_db
