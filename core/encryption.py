@@ -32,6 +32,7 @@ KEY_PATHS = [
 MASTER_KEY_ENV = "GRIDBEAR_MASTER_KEY"
 
 _cached_key: bytes | None = None
+_cached_key_source: str | None = None
 
 
 def _find_key_file() -> Path | None:
@@ -53,8 +54,16 @@ def _find_key_file() -> Path | None:
 
 
 def _get_key() -> bytes:
-    """Derive a 32-byte AES key from the master key source."""
-    global _cached_key
+    """Derive a 32-byte AES key from the master key source.
+
+    This is the single source of truth for the vault master key —
+    ``ui.secrets_manager.SecretsManager`` delegates to it instead of
+    keeping a parallel cache. Without that, the eager purge in
+    ``ensure_master_key_loaded()`` would race the SecretsManager's
+    first read in env-var-only deployments and disable the vault.
+    See gridbeario/gridbear#147.
+    """
+    global _cached_key, _cached_key_source
     if _cached_key is not None:
         return _cached_key
 
@@ -63,6 +72,7 @@ def _get_key() -> bytes:
         try:
             raw = key_file.read_bytes()
             _cached_key = hashlib.sha256(raw).digest()
+            _cached_key_source = str(key_file)
             return _cached_key
         except PermissionError as exc:
             # Belt-and-suspenders: _find_key_file already filters unreadable
@@ -78,6 +88,7 @@ def _get_key() -> bytes:
     env_val = os.environ.get(MASTER_KEY_ENV)
     if env_val:
         _cached_key = hashlib.sha256(env_val.encode()).digest()
+        _cached_key_source = f"env:{MASTER_KEY_ENV}"
         # Purge the env var once cached so child processes (plugin
         # subprocesses, Claude CLI, Playwright, MCP stdio servers)
         # can't `os.environ[MASTER_KEY_ENV]` to pull the plaintext
@@ -88,6 +99,16 @@ def _get_key() -> bytes:
     raise RuntimeError(
         "No encryption key found. Create config/secrets.key or set GRIDBEAR_MASTER_KEY."
     )
+
+
+def get_key_source() -> str | None:
+    """Return a short string describing where the cached key came from.
+
+    Returns ``None`` if the key has not been derived yet (e.g. before
+    ``_get_key()`` or ``ensure_master_key_loaded()`` is called).
+    The value is either an absolute file path or ``env:GRIDBEAR_MASTER_KEY``.
+    """
+    return _cached_key_source
 
 
 def ensure_master_key_loaded() -> None:
