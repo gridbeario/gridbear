@@ -173,16 +173,18 @@
             </h3>
         </div>
         <div class="p-5">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {% set ch_config = agent.channels[ch.name] if agent and agent.channels and agent.channels.get(ch.name) else {} %}
+            <div class="grid grid-cols-1 {% if ch.name != 'webchat' %}md:grid-cols-2{% endif %} gap-5">
+                {% if ch.name != 'webchat' %}
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-void-700 dark:text-void-200">Token Secret Name</label>
-                    {% set ch_config = agent.channels[ch.name] if agent and agent.channels and agent.channels.get(ch.name) else {} %}
                     <input type="text" name="{{ ch.name }}_token_secret"
                            value="{{ ch_config.token_secret if ch_config else '' }}"
                            placeholder="e.g., {{ ch.name|upper }}_TOKEN"
                            class="w-full bg-void-50 dark:bg-void-800/50 border border-void-200 dark:border-void-700 rounded-xl py-2.5 px-4 text-void-900 dark:text-white placeholder-void-400 dark:placeholder-void-500 focus:outline-none focus:border-nordic-500/50 transition-all">
                     <p class="text-xs text-void-500 dark:text-void-400">Name of the secret containing the bot token (leave empty to disable)</p>
                 </div>
+                {% endif %}
 
                 <div class="space-y-2">
                     <label class="block text-sm font-medium text-void-700 dark:text-void-200">Allowed Users</label>
@@ -202,7 +204,13 @@
                     {% else %}
                     <p class="text-sm text-void-500 dark:text-void-400 p-3 bg-void-50 dark:bg-void-800/30 rounded-xl border border-void-200 dark:border-void-700">No known users. Add identities in Settings &rarr; Users.</p>
                     {% endif %}
-                    <p class="text-xs text-void-500 dark:text-void-400">Select users who can interact with this agent (none = all allowed)</p>
+                    <p class="text-xs text-void-500 dark:text-void-400">
+                        {% if ch.name == 'webchat' %}
+                        Select users who can see and chat with this agent in the WebChat. Superadmins always see all agents; regular users only see agents where they are listed.
+                        {% else %}
+                        Select users who can interact with this agent on this channel (none = all allowed).
+                        {% endif %}
+                    </p>
                 </div>
             </div>
         </div>

@@ -20,6 +20,21 @@ CHANNEL_DEFAULTS = {
     "badge_abbr": None,  # Will use platform[:2].upper()
 }
 
+# Built-in (non-plugin) channels always present in the agent edit form.
+# WebChat lives in core (ui/routes/me.py + ws_chat.py), not as a plugin,
+# so it doesn't show up via plugin discovery — we inject it manually here
+# so admins can manage allowed_users for the webchat surface.
+_BUILTIN_CHANNELS = [
+    {
+        "name": "webchat",
+        "display_name": "WebChat",
+        "icon": "fas fa-globe",
+        "color": "#6366F1",
+        "badge_abbr": "WC",
+        "username_prefix": "",
+    },
+]
+
 
 def get_available_channels() -> list[dict]:
     """Discover all enabled channel plugins with UI metadata.
@@ -27,6 +42,7 @@ def get_available_channels() -> list[dict]:
     Returns list of dicts with keys:
         name, display_name, icon, color, badge_abbr, enabled
     Uses PluginManager (runtime) with fallback to plugin registry DB + manifest (static).
+    Built-in channels (webchat) are always included regardless of plugin state.
     """
     channels = []
 
@@ -42,7 +58,7 @@ def get_available_channels() -> list[dict]:
                 ui = manifest.get("ui", {})
                 channels.append(_build_channel_dict(name, ui, enabled=True))
             if channels:
-                return sorted(channels, key=lambda c: c["name"])
+                return _merge_builtins(channels)
     except Exception:
         pass
 
@@ -65,7 +81,18 @@ def get_available_channels() -> list[dict]:
         except Exception:
             logger.warning("Failed to read manifest for %s", plugin_name)
 
-    return sorted(channels, key=lambda c: c["name"])
+    return _merge_builtins(channels)
+
+
+def _merge_builtins(plugin_channels: list[dict]) -> list[dict]:
+    """Prepend built-in channels (webchat) to plugin channels, deduplicated."""
+    existing_names = {c["name"] for c in plugin_channels}
+    builtins = [
+        _build_channel_dict(b["name"], b, enabled=True)
+        for b in _BUILTIN_CHANNELS
+        if b["name"] not in existing_names
+    ]
+    return builtins + sorted(plugin_channels, key=lambda c: c["name"])
 
 
 def get_channel_ui(platform: str) -> dict:
