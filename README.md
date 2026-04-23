@@ -98,9 +98,6 @@ echo "INTERNAL_API_SECRET=$(openssl rand -hex 32)" >> .env
 # Edit .env: set GRIDBEAR_BASE_URL to your public URL
 nano .env
 
-# Edit plugins.json: enable only the plugins you need
-nano config/plugins.json
-
 # Start
 docker compose up -d
 
@@ -119,6 +116,9 @@ docker exec gridbear python3 -c \
 
 # Create admin account
 # Visit http://localhost:8088/auth/setup
+
+# Enable plugins from the admin UI: http://localhost:8088/plugins
+# (plugins are stored in PostgreSQL, not in a config file)
 ```
 
 > **Alternative to the key file**: if you prefer an env var (e.g. for
