@@ -206,6 +206,13 @@ class AgentManager:
         for ch_config in agent.config.channels:
             platform = ch_config.platform
 
+            # Built-in surfaces (webchat) have no channel plugin class to
+            # instantiate and no bot token. Skip silently — the old path
+            # fell through the token check and logged a misleading
+            # "token not found" ERROR on every boot.
+            if platform == "webchat":
+                continue
+
             # Get token from environment
             token = secrets_manager.get(ch_config.token_env, fallback_env=True)
             if not token:
