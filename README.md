@@ -53,12 +53,21 @@ Plugin-based multi-channel AI assistant framework. Connect multiple LLM runners 
 
 ### Containers
 
+**Core** (always running):
+
 | Container | Purpose | Port |
 |-----------|---------|------|
 | `gridbear` | Unified runtime: bot, agents, runners, Admin UI, MCP Gateway, REST API, User Portal | 8088 → 8080 (UI), 8000 internal (bot API) |
 | `gridbear-postgres` | PostgreSQL 17 with pgvector | 5432 |
 
-Optional services live in `docker-compose.override.yml.example` (copy to `docker-compose.override.yml` to enable): `gridbear-evolution` (WhatsApp via Evolution API), `gridbear-ollama`, `gridbear-n8n`.
+**Optional** (declared in `docker-compose.override.yml.example` — copy to `docker-compose.override.yml` to enable):
+
+| Container | Purpose | Port |
+|-----------|---------|------|
+| `gridbear-evolution` | WhatsApp gateway (Evolution API) | 8082 → 8080 |
+| `gridbear-evolution-redis` | Redis backing for Evolution | internal |
+| `gridbear-n8n` | Workflow automation | 5678 |
+| `gridbear-ollama` | Local LLM runtime | 11434 (internal) |
 
 ## Quick Start
 
@@ -84,7 +93,6 @@ cp docker-compose.override.yml.example docker-compose.override.yml
 # Generate required secrets
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 24)" >> .env
 echo "INTERNAL_API_SECRET=$(openssl rand -hex 32)" >> .env
-echo "EXECUTOR_TOKEN=$(openssl rand -hex 32)" >> .env
 
 # Edit .env: add your bot tokens (TELEGRAM_BOT_TOKEN, etc.)
 # Edit .env: set GRIDBEAR_BASE_URL to your public URL
