@@ -60,6 +60,26 @@ def get_known_users() -> dict:
                 if username not in result[platform]:
                     result[platform].append(username)
 
+    # Built-in webchat: every app user is a candidate (username == identity).
+    # Without this the webchat checkbox list would always be empty since
+    # users don't typically have a "webchat" entry in user_identities.
+    if "webchat" in result:
+        try:
+            from core.registry import get_database
+
+            db = get_database()
+            if db:
+                with db.acquire_sync() as conn:
+                    cur = conn.execute(
+                        "SELECT username FROM app.users WHERE username IS NOT NULL"
+                    )
+                    for row in cur.fetchall():
+                        uname = row["username"]
+                        if uname and uname not in result["webchat"]:
+                            result["webchat"].append(uname)
+        except Exception as exc:
+            logger.debug("Could not enumerate webchat users: %s", exc)
+
     # Sort alphabetically
     for platform in result:
         result[platform].sort(key=str.lower)
@@ -565,12 +585,17 @@ async def save_agent_config(
         token_key = f"{ch_name}_token_secret"
         users_key = f"{ch_name}_allowed_users"
         token_value = form_data.get(token_key, "")
-        if token_value:
+        allowed = form_data.getlist(users_key)
+        # Built-in channels (webchat) have no bot token; persist their
+        # config whenever there are allowed_users in the form. Plugin
+        # channels still gate on token presence.
+        is_builtin = ch_name == "webchat"
+        if token_value or (is_builtin and allowed):
             # Preserve existing channel config (e.g. phone_number_id)
             # and only update form-managed fields
             ch_config = channels.get(ch_name, {}).copy()
-            ch_config["token_secret"] = token_value
-            allowed = form_data.getlist(users_key)
+            if token_value:
+                ch_config["token_secret"] = token_value
             if allowed:
                 ch_config["allowed_users"] = [u.strip() for u in allowed if u.strip()]
             channels[ch_name] = ch_config
