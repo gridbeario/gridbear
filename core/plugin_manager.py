@@ -1044,14 +1044,28 @@ class PluginManager:
         return {"mcpServers": servers}
 
     def get_all_mcp_server_names(self) -> list[str]:
-        """Get list of all MCP server names.
+        """Get list of all MCP server names visible through the gateway.
 
-        Returns:
-            List of server names from all providers
+        Includes:
+          1. Names from registered ``mcp`` providers (and ``service``
+             plugins that declare ``mcp_provider``).
+          2. ``service`` plugins that declare ``virtual_tools`` in their
+             manifest — these are exposed via the gateway's
+             LocalToolProvider machinery (see
+             ``core/mcp_gateway/tool_providers.py``) but are NOT in
+             ``self.mcp_providers``. Without this, the admin form's
+             "MCP Permissions" list and any other consumer relying on
+             the runtime path would silently hide them
+             (gridbeario/gridbear#152).
         """
         names = []
         for provider in self.mcp_providers.values():
             names.extend(provider.get_server_names())
+        for plugin_name, manifest in self._manifests.items():
+            if manifest.get("type") == "service" and manifest.get("virtual_tools"):
+                vt_name = manifest.get("name") or plugin_name
+                if vt_name not in names:
+                    names.append(vt_name)
         return names
 
     def get_private_only_servers(self) -> set[str]:

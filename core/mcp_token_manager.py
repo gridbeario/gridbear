@@ -48,25 +48,42 @@ class MCPTokenManager:
         """Provision OAuth2 client and token for a single agent."""
         agent_name = agent.name
         mcp_permissions = agent.config.mcp_permissions or []
+        plugins_enabled = agent.config.plugins_enabled or []
 
-        if not mcp_permissions:
+        # Effective permission set is the union of explicit mcp_permissions
+        # and plugins.enabled — this matches what the gateway already does
+        # for tools/list (see core/mcp_gateway/server.py). Without the
+        # union here, an agent that enables a virtual-tool plugin (e.g.
+        # artifacts, dwh_doreca) without restating it under
+        # mcp_permissions would never get a token, the subprocess would
+        # launch without --mcp-config, and Claude would see no tools at
+        # all even though the gateway is exposing them. See
+        # gridbeario/gridbear#152.
+        effective = sorted(set(mcp_permissions) | set(plugins_enabled))
+
+        if not effective:
             logger.debug(
-                f"Agent {agent_name} has no MCP permissions, skipping token provisioning"
+                f"Agent {agent_name} has no effective MCP permissions "
+                f"(mcp_permissions and plugins.enabled both empty), "
+                f"skipping token provisioning"
             )
             return
 
-        self._agent_mcp_permissions[agent_name] = mcp_permissions
+        self._agent_mcp_permissions[agent_name] = effective
 
         # Find existing client for this agent
         client = self.oauth2_db.get_by_agent_name(agent_name)
 
         if client:
-            # Update mcp_permissions if changed
+            # Update mcp_permissions if the effective set changed. This
+            # also repairs agents stuck in the implicit-enable state from
+            # before the union semantics — they get an update_client call
+            # without needing an unrelated config touch.
             current_perms = client.get_mcp_permissions_list() or []
-            if sorted(current_perms) != sorted(mcp_permissions):
-                self.oauth2_db.update_client(client.id, mcp_permissions=mcp_permissions)
+            if sorted(current_perms) != effective:
+                self.oauth2_db.update_client(client.id, mcp_permissions=effective)
                 logger.info(
-                    f"Updated MCP permissions for agent {agent_name}: {mcp_permissions}"
+                    f"Updated MCP permissions for agent {agent_name}: {effective}"
                 )
 
             # Regenerate secret so we can create a fresh token
@@ -82,7 +99,7 @@ class MCPTokenManager:
                 name=f"GridBear Agent - {agent_name}",
                 client_type="confidential",
                 agent_name=agent_name,
-                mcp_permissions=mcp_permissions,
+                mcp_permissions=effective,
                 access_token_expiry=86400,  # 24h
                 require_pkce=False,
                 allowed_scopes="mcp",
