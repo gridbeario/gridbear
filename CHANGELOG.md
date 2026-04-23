@@ -7,9 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-04-23
+
+### Security
+
+- **Master-key handling hardening**: three small changes to the secrets vault key derivation. (1) `/root/.ssh/id_ed25519` and `/root/.ssh/id_rsa` removed from the candidate master-key path list — silently consuming a host-pinned root SSH key as the vault master key would lead to an unreadable vault on a different host. Home-dir SSH paths remain for operators relying on the legacy fallback. (2) `GRIDBEAR_MASTER_KEY` is purged from `os.environ` immediately after the key is derived (regardless of source), so subprocesses spawned afterwards (Claude CLI, Playwright, MCP stdio servers, plugin scripts) can no longer read the plaintext master key from `/proc/<pid>/environ`. New `core.encryption.ensure_master_key_loaded()` wraps derivation+purge and is called eagerly at `ui/app.py` import. (3) Generated key file's parent directory tightened to `0700` (the file itself was already `0600`).
+
+### Fixed
+
+- **Gmail OAuth PKCE verifier**: the `code_verifier` is now persisted across the OAuth redirect so the token exchange no longer fails on the second leg of the flow.
+- **MCP gateway tools cache**: the cached tool list is now invalidated on agent reload and on identity switch, so tool changes are visible without restarting the gateway.
+- **MCP gateway notifications**: users are notified only on actionable auth failures, not on every transient gateway hiccup that resolves itself.
+- **/me sidebar Workflows link**: hidden when the workflow plugin is not installed (was rendering a dead link on installs without the plugin).
+
+### Improved
+
+- **Sliding session expiration** (`ui/auth`): active users stay logged in. The session deadline slides forward on every authenticated request instead of expiring at a fixed wall-clock time after login.
+
+### Added
+
+- **Documentation site**: MkDocs Material site scaffold with seed pages and a CI workflow that deploys to GitHub Pages on every push to `main`.
+
 ### Removed
 
 - **Sandboxed code executor container**: the optional `gridbear-executor` service (opt-in via `docker-compose.override.yml.example`) has been removed together with the `executor/` image sources, the `EXECUTOR_TOKEN` and `DOCKER_GID` env vars, and the `executor-internal` network. It had no in-tree consumers; operators who were relying on it can keep running the old image from a fork or an out-of-tree override.
+- **Empty `.claude.container.json.example`**: stale empty file dropped from the repo.
+
+### Dependencies
+
+- GitHub Actions: `actions/upload-artifact` 4.6.2 → 7.0.1, `actions/cache` 5.0.4 → 5.0.5.
 
 ## [0.8.1] - 2026-04-19
 
