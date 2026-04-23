@@ -13,10 +13,10 @@ Plugin-based multi-channel AI assistant framework. Connect multiple LLM runners 
 ## Features
 
 - **Multi-runner**: Claude API/CLI, OpenAI, Gemini, Ollama — switch per-agent
-- **Multi-channel**: Telegram, Discord, WhatsApp (via Evolution API)
+- **Multi-channel**: Telegram, Discord, WhatsApp (Evolution API or Meta Cloud API)
 - **Plugin system**: 40+ plugins with manifest.json discovery, dependency resolution, and hot-reload
 - **MCP Gateway**: SSE-based gateway with per-user OAuth2 connections, circuit breakers, rate limiting
-- **Multi-agent**: YAML-configured agents with independent channels, tools, and system prompts
+- **Multi-agent**: DB-configured agents (managed from the admin UI) with independent channels, tools, and system prompts; hot-reload for most edits
 - **Memory**: Episodic and declarative memory with PostgreSQL pgvector
 - **Workflow engine**: Visual DAG editor with agent, tool, condition, transform, and approval steps
 - **Admin UI**: Web-based management with Nordic Tailwind design, plugin admin pages, and theme support
@@ -53,12 +53,21 @@ Plugin-based multi-channel AI assistant framework. Connect multiple LLM runners 
 
 ### Containers
 
+**Core** (always running):
+
 | Container | Purpose | Port |
 |-----------|---------|------|
-| `gridbear` | Bot runtime: agents, message processing, runners | 8000 (internal) |
-| `gridbear-ui` | Admin UI, MCP Gateway, REST API, User Portal | 8088 → 8080 |
+| `gridbear` | Unified runtime: bot, agents, runners, Admin UI, MCP Gateway, REST API, User Portal | 8088 → 8080 (UI), 8000 internal (bot API) |
 | `gridbear-postgres` | PostgreSQL 17 with pgvector | 5432 |
+
+**Optional** (declared in `docker-compose.override.yml.example` — copy to `docker-compose.override.yml` to enable):
+
+| Container | Purpose | Port |
+|-----------|---------|------|
 | `gridbear-evolution` | WhatsApp gateway (Evolution API) | 8082 → 8080 |
+| `gridbear-evolution-redis` | Redis backing for Evolution | internal |
+| `gridbear-n8n` | Workflow automation | 5678 |
+| `gridbear-ollama` | Local LLM runtime | 11434 (internal) |
 
 ## Quick Start
 
@@ -84,14 +93,10 @@ cp docker-compose.override.yml.example docker-compose.override.yml
 # Generate required secrets
 echo "POSTGRES_PASSWORD=$(openssl rand -base64 24)" >> .env
 echo "INTERNAL_API_SECRET=$(openssl rand -hex 32)" >> .env
-echo "EXECUTOR_TOKEN=$(openssl rand -hex 32)" >> .env
 
 # Edit .env: add your bot tokens (TELEGRAM_BOT_TOKEN, etc.)
 # Edit .env: set GRIDBEAR_BASE_URL to your public URL
 nano .env
-
-# Edit plugins.json: enable only the plugins you need
-nano config/plugins.json
 
 # Start
 docker compose up -d
@@ -111,6 +116,9 @@ docker exec gridbear python3 -c \
 
 # Create admin account
 # Visit http://localhost:8088/auth/setup
+
+# Enable plugins from the admin UI: http://localhost:8088/plugins
+# (plugins are stored in PostgreSQL, not in a config file)
 ```
 
 > **Alternative to the key file**: if you prefer an env var (e.g. for
@@ -121,20 +129,14 @@ docker exec gridbear python3 -c \
 
 ### Agent Configuration
 
-Create agent config files in `config/agents/`:
+Create and edit agents from the admin UI at `http://localhost:8088/agents`. Each agent defines:
 
-```bash
-cp config/agents/myagent.yaml.example config/agents/main.yaml
-nano config/agents/main.yaml
-```
-
-Each agent YAML defines:
-- Which channels it listens on and authorized users
+- Which channels it listens on and which users are authorized
 - Which runner (LLM) to use and model settings
 - System prompt and personality
-- MCP tool permissions
+- MCP tool permissions and per-agent plugin overrides
 
-See `config/agents/myagent.yaml.example` for a complete reference.
+Agent configuration is stored in PostgreSQL (`app.agent_configs`) with hot-reload — most edits take effect without a container restart. Legacy YAML files under `config/agents/` were auto-migrated to the database in 0.8.0 and renamed to `*.migrated`.
 
 ## Plugin Types
 
@@ -146,7 +148,7 @@ See `config/agents/myagent.yaml.example` for a complete reference.
 | **mcp** | 7 | gmail, homeassistant, github, playwright, google-workspace |
 | **theme** | 3 | theme-nordic, theme-enterprise, theme-tailadmin |
 
-Plugins are discovered via `manifest.json` in each plugin directory. Enable them in `config/plugins.json`.
+Plugins are discovered via `manifest.json` in each plugin directory. Enable them from the admin UI at `/plugins` (state persisted in PostgreSQL).
 
 ### When a restart is required
 
@@ -155,7 +157,7 @@ that is **already enabled at boot** — useful while iterating on a plugin's
 admin page, config, secrets, or skills. Two operations still require a
 container restart (`docker compose restart gridbear`):
 
-- **Enabling or disabling a plugin** via `/plugins/` or `config/plugins.json`.
+- **Enabling or disabling a plugin** via `/plugins/`.
   This is especially relevant for **runners** (Claude, OpenAI, Gemini,
   Ollama) — enabling a new runner plugin writes the registry entry but
   the runner class only joins the plugin manager at the next boot; agents
@@ -179,12 +181,8 @@ ruff format .
 
 # Build CSS (requires Node.js)
 npm install
-npm run css:build
-
-# Hot-reload for UI development
-# Add to docker-compose.override.yml:
-#   ui:
-#     command: uvicorn ui.app:app --host 0.0.0.0 --port 8080 --reload
+npm run css:build       # one-shot
+npm run css:watch       # rebuild on change while iterating on templates
 ```
 
 ### Project Structure
@@ -210,6 +208,6 @@ Full documentation — Getting Started, Architecture, Plugin Development, API Re
 
 ## License
 
-[LGPL-3.0](LICENSE) - Copyright (C) 2024 Dubhe Srls
+[LGPL-3.0](LICENSE) - Copyright (C) 2025-2026 Dubhe Srls
 
 See [ATTRIBUTIONS.md](ATTRIBUTIONS.md) for third-party library credits.
