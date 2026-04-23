@@ -232,46 +232,56 @@ class SecretsManager:
         return path
 
     def _get_master_key(self) -> bytes:
-        """Get or derive the master encryption key from key file."""
+        """Get or derive the master encryption key.
+
+        For the production singleton (no ``ssh_key_path`` override),
+        delegates to ``core.encryption._get_key()`` so SecretsManager
+        and the application-layer encryption module share a single
+        cache. Without this, ``ensure_master_key_loaded()`` (called at
+        ``ui/app.py`` import time) would derive the key, purge
+        ``GRIDBEAR_MASTER_KEY`` from ``os.environ``, and leave
+        SecretsManager unable to find anything when its parallel
+        ``_get_master_key`` ran later in env-var-only deployments —
+        the regression that gridbeario/gridbear#147 reports.
+
+        The key bytes (SHA-256 of file contents or env value) are
+        identical between the two derivation paths, so existing
+        ciphertexts decrypt unchanged.
+
+        Instances constructed with an explicit ``ssh_key_path`` (used
+        by unit tests to inject a temp key file) bypass the shared
+        cache and derive directly, so each test stays isolated.
+        """
         if self._key:
             return self._key
 
-        # Try key file first
-        key_path = self._find_key_file()
-        if key_path:
-            try:
-                key_content = key_path.read_bytes()
-                # Derive a 256-bit key using SHA-256 of the key file content
-                self._key = hashlib.sha256(key_content).digest()
-                self._key_source = str(key_path)
-                # Purge the env-var fallback now that we've derived the
-                # key from a file — leaving GRIDBEAR_MASTER_KEY visible
-                # in os.environ would let any child process
-                # (plugin subprocesses, Claude CLI, Playwright, MCP
-                # stdio servers) read the plaintext master key out of
-                # /proc/<pid>/environ, which bypasses the AES layer
-                # entirely.
-                os.environ.pop(MASTER_KEY_ENV, None)
-                return self._key
-            except PermissionError:
-                pass  # Fall through to env var
+        # Test/override path: explicit per-instance key file
+        if self.ssh_key_path:
+            key_path = self._find_key_file()
+            if key_path:
+                try:
+                    self._key = hashlib.sha256(key_path.read_bytes()).digest()
+                    self._key_source = str(key_path)
+                    return self._key
+                except PermissionError:
+                    pass
 
-        # Fallback to environment variable (try new name, then legacy)
-        master_key = os.getenv(MASTER_KEY_ENV)
-        if master_key:
-            self._key = hashlib.sha256(master_key.encode()).digest()
-            self._key_source = f"env:{MASTER_KEY_ENV}"
-            # Same purge rationale as above — the env var is no longer
-            # needed once we've derived the key.
-            os.environ.pop(MASTER_KEY_ENV, None)
+        # Production path: delegate to the shared cache
+        from core import encryption
+
+        try:
+            self._key = encryption._get_key()
+            self._key_source = encryption.get_key_source()
             return self._key
-
-        raise RuntimeError(
-            "No encryption key found. Either:\n"
-            '1. Run: python -c "from ui.secrets_manager import SecretsManager; SecretsManager.generate_key_file()"\n'
-            "2. Or ensure SSH key exists at ~/.ssh/id_rsa or ~/.ssh/id_ed25519\n"
-            f"3. Or set {MASTER_KEY_ENV} environment variable"
-        )
+        except RuntimeError:
+            # Re-raise with the SecretsManager-specific message so the
+            # admin UI hint pointing at generate_key_file stays useful.
+            raise RuntimeError(
+                "No encryption key found. Either:\n"
+                '1. Run: python -c "from ui.secrets_manager import SecretsManager; SecretsManager.generate_key_file()"\n'
+                "2. Or ensure SSH key exists at ~/.ssh/id_rsa or ~/.ssh/id_ed25519\n"
+                f"3. Or set {MASTER_KEY_ENV} environment variable"
+            ) from None
 
     def get_key_source(self) -> Optional[str]:
         """Return the source of the master key (for display)."""
@@ -552,9 +562,15 @@ def reset_secrets_manager() -> None:
     if db:
         _init_pg(db)
         secrets_manager._pg = db
-        # Reset cached key so it's reloaded from PG on next access
+        # Reset both caches in lock-step. We delegate key derivation to
+        # core.encryption (single source of truth, see _get_master_key);
+        # forgetting to reset that one would let SecretsManager continue
+        # serving the old key after a forced rotation.
         secrets_manager._key = None
         secrets_manager._key_source = None
+        from core import encryption
+
+        encryption.reset_cached_key()
 
 
 def get_secret(key_name: str, fallback_env: bool = True) -> SecretStr | None:
