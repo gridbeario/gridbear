@@ -329,6 +329,29 @@
         </div>
     </div>
 
+    <!-- Services (type=service plugins only) -->
+    <div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
+        <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-frost-500/5 to-transparent">
+            <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
+                <i class="fas fa-puzzle-piece text-frost-500"></i>
+                Enabled Services
+            </h3>
+            <p class="text-sm text-void-500 dark:text-void-400 mt-1">Service plugins (memory, sessions, attachments…) loaded for this agent. MCP tool plugins are managed under "MCP Permissions" below; channel plugins under their own sections.</p>
+        </div>
+        <div class="p-5">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {% for plugin in available_services %}
+                <label class="flex items-center gap-2 p-3 rounded-xl hover:bg-void-50 dark:hover:bg-void-800/50 cursor-pointer transition-colors border border-transparent hover:border-void-200 dark:hover:border-void-700">
+                    <input type="checkbox" name="plugins_enabled" value="{{ plugin }}"
+                           {% if agent and plugin in agent.get('plugins', {}).get('enabled', []) %}checked{% endif %}
+                           class="w-4 h-4 rounded border-void-300 dark:border-void-600 text-frost-500 focus:ring-frost-500/20">
+                    <span class="text-sm text-void-700 dark:text-void-200">{{ plugin }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
     <!-- MCP Permissions -->
     <div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
         <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-ember-500/5 to-transparent">
@@ -405,29 +428,6 @@
                 </a>
             </div>
             {% endif %}
-        </div>
-    </div>
-
-    <!-- Plugins -->
-    <div class="rounded-2xl bg-white dark:bg-void-900/50 border border-void-200 dark:border-void-800 overflow-hidden">
-        <div class="p-5 border-b border-void-200 dark:border-void-800 bg-gradient-to-r from-frost-500/5 to-transparent">
-            <h3 class="font-semibold text-void-900 dark:text-white flex items-center gap-2">
-                <i class="fas fa-puzzle-piece text-frost-500"></i>
-                Enabled Plugins
-            </h3>
-            <p class="text-sm text-void-500 dark:text-void-400 mt-1">Select which plugins should be enabled for this agent</p>
-        </div>
-        <div class="p-5">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-                {% for plugin in available_services %}
-                <label class="flex items-center gap-2 p-3 rounded-xl hover:bg-void-50 dark:hover:bg-void-800/50 cursor-pointer transition-colors border border-transparent hover:border-void-200 dark:hover:border-void-700">
-                    <input type="checkbox" name="plugins_enabled" value="{{ plugin }}"
-                           {% if agent and plugin in agent.get('plugins', {}).get('enabled', []) %}checked{% endif %}
-                           class="w-4 h-4 rounded border-void-300 dark:border-void-600 text-frost-500 focus:ring-frost-500/20">
-                    <span class="text-sm text-void-700 dark:text-void-200">{{ plugin }}</span>
-                </label>
-                {% endfor %}
-            </div>
         </div>
     </div>
 
