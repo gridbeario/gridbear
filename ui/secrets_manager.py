@@ -38,16 +38,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Key paths to try (in order of preference)
 # 1. GridBear-specific key in config dir (preferred - portable)
 # 2. SSH keys as fallback
+# Candidate key file locations, in preference order. Dedicated
+# config/secrets.key wins; the home-dir SSH paths remain for operators
+# who were relying on the fallback. The hard-coded /root/.ssh/* paths
+# have been removed: the container should not run as root, and if it
+# does, using a root-owned SSH key as the vault master key is a
+# host-pinned surprise (different host → different key → vault lost).
 KEY_PATHS = [
-    BASE_DIR / "config" / "secrets.key",  # GridBear-specific key (recommended)
+    BASE_DIR / "config" / "secrets.key",
     Path.home() / ".ssh" / "id_ed25519",
     Path.home() / ".ssh" / "id_rsa",
-    Path("/root/.ssh/id_ed25519"),
-    Path("/root/.ssh/id_rsa"),
-    Path("/app/config/secrets.key"),  # Container path
+    Path("/app/config/secrets.key"),
 ]
 
-# Fallback to env var if no SSH key found
 MASTER_KEY_ENV = "GRIDBEAR_MASTER_KEY"
 
 # PostgreSQL DDL — applied once via _init_pg()
@@ -208,6 +211,16 @@ class SecretsManager:
             path = BASE_DIR / "config" / "secrets.key"
 
         path.parent.mkdir(parents=True, exist_ok=True)
+        # Tighten the parent directory — the key file itself is 0600,
+        # but a 0755 containing dir still lets any local user enumerate
+        # "there is a secret here" and race a replacement if perms ever
+        # slip. 0700 matches the OpenSSH .ssh convention.
+        try:
+            path.parent.chmod(0o700)
+        except OSError:
+            # Non-fatal: shared filesystems (e.g. Windows bind mounts)
+            # reject chmod. The file permission above is still enforced.
+            pass
 
         # Generate 64 bytes of random data (512 bits)
         key_data = stdlib_secrets.token_bytes(64)
@@ -231,6 +244,14 @@ class SecretsManager:
                 # Derive a 256-bit key using SHA-256 of the key file content
                 self._key = hashlib.sha256(key_content).digest()
                 self._key_source = str(key_path)
+                # Purge the env-var fallback now that we've derived the
+                # key from a file — leaving GRIDBEAR_MASTER_KEY visible
+                # in os.environ would let any child process
+                # (plugin subprocesses, Claude CLI, Playwright, MCP
+                # stdio servers) read the plaintext master key out of
+                # /proc/<pid>/environ, which bypasses the AES layer
+                # entirely.
+                os.environ.pop(MASTER_KEY_ENV, None)
                 return self._key
             except PermissionError:
                 pass  # Fall through to env var
@@ -240,6 +261,9 @@ class SecretsManager:
         if master_key:
             self._key = hashlib.sha256(master_key.encode()).digest()
             self._key_source = f"env:{MASTER_KEY_ENV}"
+            # Same purge rationale as above — the env var is no longer
+            # needed once we've derived the key.
+            os.environ.pop(MASTER_KEY_ENV, None)
             return self._key
 
         raise RuntimeError(
