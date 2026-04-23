@@ -55,10 +55,10 @@ Plugin-based multi-channel AI assistant framework. Connect multiple LLM runners 
 
 | Container | Purpose | Port |
 |-----------|---------|------|
-| `gridbear` | Bot runtime: agents, message processing, runners | 8000 (internal) |
-| `gridbear-ui` | Admin UI, MCP Gateway, REST API, User Portal | 8088 → 8080 |
+| `gridbear` | Unified runtime: bot, agents, runners, Admin UI, MCP Gateway, REST API, User Portal | 8088 → 8080 (UI), 8000 internal (bot API) |
 | `gridbear-postgres` | PostgreSQL 17 with pgvector | 5432 |
-| `gridbear-evolution` | WhatsApp gateway (Evolution API) | 8082 → 8080 |
+
+Optional services live in `docker-compose.override.yml.example` (copy to `docker-compose.override.yml` to enable): `gridbear-evolution` (WhatsApp via Evolution API), `gridbear-ollama`, `gridbear-n8n`.
 
 ## Quick Start
 
@@ -210,6 +210,6 @@ Full documentation — Getting Started, Architecture, Plugin Development, API Re
 
 ## License
 
-[LGPL-3.0](LICENSE) - Copyright (C) 2024 Dubhe Srls
+[LGPL-3.0](LICENSE) - Copyright (C) 2025-2026 Dubhe Srls
 
 See [ATTRIBUTIONS.md](ATTRIBUTIONS.md) for third-party library credits.
