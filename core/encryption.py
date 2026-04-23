@@ -111,19 +111,6 @@ def get_key_source() -> str | None:
     return _cached_key_source
 
 
-def reset_cached_key() -> None:
-    """Drop the cached key + source. Test/diagnostic use only.
-
-    Production code should never need this — the cached key is
-    valid for the lifetime of the process. Call sites that recycle
-    the secrets manager (e.g. ``reset_secrets_manager``) use this
-    to keep both caches in sync.
-    """
-    global _cached_key, _cached_key_source
-    _cached_key = None
-    _cached_key_source = None
-
-
 def ensure_master_key_loaded() -> None:
     """Force master-key derivation and purge ``GRIDBEAR_MASTER_KEY`` from env.
 

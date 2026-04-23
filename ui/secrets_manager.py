@@ -562,15 +562,15 @@ def reset_secrets_manager() -> None:
     if db:
         _init_pg(db)
         secrets_manager._pg = db
-        # Reset both caches in lock-step. We delegate key derivation to
-        # core.encryption (single source of truth, see _get_master_key);
-        # forgetting to reset that one would let SecretsManager continue
-        # serving the old key after a forced rotation.
+        # Drop SecretsManager's instance-level cache so the next call
+        # re-fetches the source string via core.encryption.get_key_source().
+        # We deliberately do NOT reset core.encryption's _cached_key:
+        # ensure_master_key_loaded() ran at ui/app.py import time and
+        # already purged GRIDBEAR_MASTER_KEY from os.environ, so wiping
+        # the shared cache here would leave env-var-only deployments
+        # with no derivable source on the next access (see #147 follow-up).
         secrets_manager._key = None
         secrets_manager._key_source = None
-        from core import encryption
-
-        encryption.reset_cached_key()
 
 
 def get_secret(key_name: str, fallback_env: bool = True) -> SecretStr | None:
