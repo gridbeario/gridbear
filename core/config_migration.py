@@ -26,6 +26,7 @@ _MARKER_MCP_PERMS_UNIFIED_ID = "_migration_mcp_perms_unified_id"
 _MARKER_DEFAULT_COMPANY = "_migration_default_company"
 _MARKER_UNIFY_USERS = "_migration_unify_users"
 _MARKER_USER_PLATFORMS = "_migration_user_platforms"
+_MARKER_SEED_LANGUAGES = "_migration_seed_languages"
 
 
 async def migrate_admin_config_to_db(config_path: Path) -> bool:
@@ -492,6 +493,47 @@ async def migrate_create_default_company() -> bool:
 
     await SystemConfig.set_param(_MARKER_DEFAULT_COMPANY, True)
     logger.info("Default company migration complete")
+    return True
+
+
+async def migrate_seed_languages() -> bool:
+    """Seed i18n.languages with English (default) and Italian on first boot.
+
+    The Language ORM model auto-creates the table; this seed populates the
+    minimum set so /admin/languages is functional out of the box. Idempotent
+    via SystemConfig marker.
+
+    Returns True if seed was performed, False if skipped.
+    """
+    from core.registry import get_database
+    from core.system_config import SystemConfig
+
+    marker = await SystemConfig.get_param(_MARKER_SEED_LANGUAGES)
+    if marker:
+        return False
+
+    db = get_database()
+    async with db.acquire() as conn:
+        # Defensive: ORM should have created the table, skip cleanly if not
+        tbl_check = await conn.execute(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = 'i18n' AND table_name = 'languages'"
+        )
+        if not await tbl_check.fetchone():
+            logger.warning("i18n.languages table not found — skipping language seed")
+            return False
+
+        await conn.execute(
+            """
+            INSERT INTO i18n.languages (code, name, active, is_default)
+            VALUES ('en', 'English', TRUE, TRUE),
+                   ('it', 'Italiano', TRUE, FALSE)
+            ON CONFLICT (code) DO NOTHING
+            """
+        )
+
+    await SystemConfig.set_param(_MARKER_SEED_LANGUAGES, True)
+    logger.info("Language seed complete (en, it)")
     return True
 
 
