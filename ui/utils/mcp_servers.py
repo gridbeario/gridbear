@@ -53,7 +53,15 @@ def _static_server_names() -> list[str]:
     names: list[str] = []
     for plugin_name in enabled:
         manifest = manifests.get(plugin_name)
-        if not manifest or manifest.get("type") != "mcp":
+        if not manifest:
+            continue
+        # Two surfaces are exposed through the gateway: dedicated `type: mcp`
+        # plugins and `type: service` plugins that declare `virtual_tools`
+        # in their manifest (see core/mcp_gateway/tool_providers.py). Both
+        # become entries in the gateway's tool list and both must be
+        # selectable from the agent admin form, otherwise virtual-tool
+        # providers are unreachable from the UI (gridbeario/gridbear#152).
+        if manifest.get("type") != "mcp" and not manifest.get("virtual_tools"):
             continue
         if manifest.get("mcp_naming") in {"per_account", "per_tenant"}:
             continue
