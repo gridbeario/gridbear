@@ -13,10 +13,10 @@ Plugin-based multi-channel AI assistant framework. Connect multiple LLM runners 
 ## Features
 
 - **Multi-runner**: Claude API/CLI, OpenAI, Gemini, Ollama — switch per-agent
-- **Multi-channel**: Telegram, Discord, WhatsApp (via Evolution API)
+- **Multi-channel**: Telegram, Discord, WhatsApp (Evolution API or Meta Cloud API)
 - **Plugin system**: 40+ plugins with manifest.json discovery, dependency resolution, and hot-reload
 - **MCP Gateway**: SSE-based gateway with per-user OAuth2 connections, circuit breakers, rate limiting
-- **Multi-agent**: YAML-configured agents with independent channels, tools, and system prompts
+- **Multi-agent**: DB-configured agents (managed from the admin UI) with independent channels, tools, and system prompts; hot-reload for most edits
 - **Memory**: Episodic and declarative memory with PostgreSQL pgvector
 - **Workflow engine**: Visual DAG editor with agent, tool, condition, transform, and approval steps
 - **Admin UI**: Web-based management with Nordic Tailwind design, plugin admin pages, and theme support
@@ -129,20 +129,14 @@ docker exec gridbear python3 -c \
 
 ### Agent Configuration
 
-Create agent config files in `config/agents/`:
+Create and edit agents from the admin UI at `http://localhost:8088/agents`. Each agent defines:
 
-```bash
-cp config/agents/myagent.yaml.example config/agents/main.yaml
-nano config/agents/main.yaml
-```
-
-Each agent YAML defines:
-- Which channels it listens on and authorized users
+- Which channels it listens on and which users are authorized
 - Which runner (LLM) to use and model settings
 - System prompt and personality
-- MCP tool permissions
+- MCP tool permissions and per-agent plugin overrides
 
-See `config/agents/myagent.yaml.example` for a complete reference.
+Agent configuration is stored in PostgreSQL (`app.agent_configs`) with hot-reload — most edits take effect without a container restart. Legacy YAML files under `config/agents/` were auto-migrated to the database in 0.8.0 and renamed to `*.migrated`.
 
 ## Plugin Types
 
@@ -154,7 +148,7 @@ See `config/agents/myagent.yaml.example` for a complete reference.
 | **mcp** | 7 | gmail, homeassistant, github, playwright, google-workspace |
 | **theme** | 3 | theme-nordic, theme-enterprise, theme-tailadmin |
 
-Plugins are discovered via `manifest.json` in each plugin directory. Enable them in `config/plugins.json`.
+Plugins are discovered via `manifest.json` in each plugin directory. Enable them from the admin UI at `/plugins` (state persisted in PostgreSQL).
 
 ### When a restart is required
 
@@ -163,7 +157,7 @@ that is **already enabled at boot** — useful while iterating on a plugin's
 admin page, config, secrets, or skills. Two operations still require a
 container restart (`docker compose restart gridbear`):
 
-- **Enabling or disabling a plugin** via `/plugins/` or `config/plugins.json`.
+- **Enabling or disabling a plugin** via `/plugins/`.
   This is especially relevant for **runners** (Claude, OpenAI, Gemini,
   Ollama) — enabling a new runner plugin writes the registry entry but
   the runner class only joins the plugin manager at the next boot; agents
@@ -187,12 +181,8 @@ ruff format .
 
 # Build CSS (requires Node.js)
 npm install
-npm run css:build
-
-# Hot-reload for UI development
-# Add to docker-compose.override.yml:
-#   ui:
-#     command: uvicorn ui.app:app --host 0.0.0.0 --port 8080 --reload
+npm run css:build       # one-shot
+npm run css:watch       # rebuild on change while iterating on templates
 ```
 
 ### Project Structure
