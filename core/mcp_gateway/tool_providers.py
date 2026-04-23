@@ -1,9 +1,8 @@
 """Discover and register LocalToolProvider instances from plugins."""
 
 import importlib.util
-import logging
 
-logger = logging.getLogger(__name__)
+from config.logging_config import logger
 
 
 def discover_local_tool_providers(mcp_server) -> None:
