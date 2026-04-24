@@ -54,7 +54,7 @@ def _get_orm_models() -> list[dict]:
     from core.orm.registry import Registry
 
     models = []
-    for model_cls in Registry.get_models():
+    for model_cls in Registry.get_visible_models():
         key = f"{model_cls._schema}.{model_cls._name}"
         models.append(
             {
