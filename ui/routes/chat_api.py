@@ -251,15 +251,23 @@ def save_message(
     content: str,
     metadata: dict | None = None,
     sender_id: str | None = None,
-):
-    """Save a message and update conversation timestamp. Auto-title if empty."""
+) -> int | None:
+    """Save a message and update conversation timestamp. Auto-title if empty.
+
+    Returns the new ``chat.webchat_messages.id`` so callers can echo it
+    back to the client over WebSocket — the frontend uses it to backfill
+    ``msg.dbId`` on locally-pushed messages, which is the prerequisite
+    for the per-message DELETE endpoint to address the right row.
+    """
     _ensure_db()
     encrypted_content = encrypt(content)
+    new_id: int | None = None
     with _db.acquire_sync() as conn:
-        conn.execute(
+        cur = conn.execute(
             """INSERT INTO chat.webchat_messages
                (conversation_id, role, content, metadata_json, sender_id)
-               VALUES (%s, %s, %s, %s, %s)""",
+               VALUES (%s, %s, %s, %s, %s)
+               RETURNING id""",
             (
                 conversation_id,
                 role,
@@ -268,6 +276,9 @@ def save_message(
                 sender_id,
             ),
         )
+        row = cur.fetchone()
+        if row:
+            new_id = row["id"]
         conn.execute(
             "UPDATE chat.webchat_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
             (conversation_id,),
@@ -287,6 +298,7 @@ def save_message(
                     (title, conversation_id),
                 )
         conn.commit()
+    return new_id
 
 
 def get_conversation_title(conversation_id: str) -> str:
