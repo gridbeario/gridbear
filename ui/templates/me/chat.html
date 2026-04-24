@@ -596,6 +596,14 @@
                                               :class="msg.role === 'user' ? 'text-frost-500' : msg.role === 'other_user' ? 'text-amber-500' : 'text-nordic-500'"
                                               x-text="msg.role === 'user' ? '{{ user.display_name or user.username }}' : msg.role === 'other_user' ? msg.display_name : msg.agent || selectedAgent"></span>
                                         <span class="text-[10px] text-void-400" x-text="msg.time"></span>
+                                        <template x-if="isSuperadmin && msg.dbId">
+                                            <button @click="deleteMessage(msg)"
+                                                    :title="i18n.deleteMessageTooltip"
+                                                    class="ml-auto text-[10px] text-void-300 hover:text-red-500 transition-colors p-1 -m-1"
+                                                    aria-label="Delete message">
+                                                <i class="fas fa-trash-can"></i>
+                                            </button>
+                                        </template>
                                     </div>
                                     <!-- Attachment thumbnails in message -->
                                     <template x-if="msg.attachments && msg.attachments.length">
@@ -752,6 +760,8 @@ window.i18n = {
     attachFile: {{ _("Attach file")|tojson }},
     dropFilesHere: {{ _("Drop files here")|tojson }},
     deleteConfirm: {{ _("Delete this conversation?")|tojson }},
+    deleteMessageConfirm: {{ _("Delete this message? This cannot be undone.")|tojson }},
+    deleteMessageTooltip: {{ _("Delete this message (admin only)")|tojson }},
     renamePrompt: {{ _("Rename conversation:")|tojson }},
     error: {{ _("Error:")|tojson }},
     toolCall: {{ _("Tool call")|tojson }},
@@ -764,6 +774,7 @@ window.i18n = {
 <script>
 function chatApp() {
     return {
+        isSuperadmin: {{ user.is_superadmin|tojson }},
         selectedAgent: '{{ agents[0].name if agents else '' }}',
         agentNames: { {% for agent in agents %}'{{ agent.name }}': '{{ agent.display_name or agent.name }}'{% if not loop.last %}, {% endif %}{% endfor %} },
         messages: [],
@@ -1126,6 +1137,7 @@ function chatApp() {
                         }
                         return {
                             id: ++self.msgCounter,
+                            dbId: m.id,
                             role: role,
                             sender: m.sender_id,
                             display_name: m.sender_display_name || m.sender_id,
@@ -1165,6 +1177,26 @@ function chatApp() {
                     }
                 }
             });
+        },
+
+        deleteMessage(msg) {
+            if (!this.isSuperadmin || !msg || !msg.dbId || !this.activeConversationId) return;
+            if (!confirm(i18n.deleteMessageConfirm)) return;
+            var self = this;
+            var localId = msg.id;
+            fetch('/me/chat/api/conversations/' + this.activeConversationId + '/messages/' + msg.dbId, {
+                method: 'DELETE',
+                headers: self._apiHeaders(),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    self.messages = self.messages.filter(function(m) { return m.id !== localId; });
+                } else {
+                    alert(i18n.error + ' ' + (data.error || 'delete failed'));
+                }
+            })
+            .catch(function(err) { alert(i18n.networkError + ': ' + err.message); });
         },
 
         renameConversation(conv) {
@@ -1322,6 +1354,29 @@ function chatApp() {
                     });
                     self.isTyping = false;
                     self.$nextTick(function() { self.scrollToBottom(); });
+                } else if (data.type === 'message_persisted') {
+                    // Server is telling us the DB id of the most recent
+                    // save matching this role. Walk from the tail and
+                    // attach dbId to the first message of that role
+                    // without one yet — this is the locally-pushed copy
+                    // we rendered before the round-trip completed.
+                    //
+                    // Server says role="user" from the sender's POV; on
+                    // other participants' clients the same message is
+                    // rendered as "other_user" (see user_message handler).
+                    // Match both flavours when the server says "user".
+                    if (data.id && data.role) {
+                        var matchRoles = data.role === 'user'
+                            ? ['user', 'other_user']
+                            : [data.role];
+                        for (var i = self.messages.length - 1; i >= 0; i--) {
+                            var m = self.messages[i];
+                            if (matchRoles.indexOf(m.role) !== -1 && !m.dbId) {
+                                m.dbId = data.id;
+                                break;
+                            }
+                        }
+                    }
                 } else if (data.type === 'user_message') {
                     // Message from another user in shared conversation
                     // Only render if it belongs to the currently active conversation

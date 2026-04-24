@@ -251,15 +251,23 @@ def save_message(
     content: str,
     metadata: dict | None = None,
     sender_id: str | None = None,
-):
-    """Save a message and update conversation timestamp. Auto-title if empty."""
+) -> int | None:
+    """Save a message and update conversation timestamp. Auto-title if empty.
+
+    Returns the new ``chat.webchat_messages.id`` so callers can echo it
+    back to the client over WebSocket — the frontend uses it to backfill
+    ``msg.dbId`` on locally-pushed messages, which is the prerequisite
+    for the per-message DELETE endpoint to address the right row.
+    """
     _ensure_db()
     encrypted_content = encrypt(content)
+    new_id: int | None = None
     with _db.acquire_sync() as conn:
-        conn.execute(
+        cur = conn.execute(
             """INSERT INTO chat.webchat_messages
                (conversation_id, role, content, metadata_json, sender_id)
-               VALUES (%s, %s, %s, %s, %s)""",
+               VALUES (%s, %s, %s, %s, %s)
+               RETURNING id""",
             (
                 conversation_id,
                 role,
@@ -268,6 +276,9 @@ def save_message(
                 sender_id,
             ),
         )
+        row = cur.fetchone()
+        if row:
+            new_id = row["id"]
         conn.execute(
             "UPDATE chat.webchat_conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = %s",
             (conversation_id,),
@@ -287,6 +298,7 @@ def save_message(
                     (title, conversation_id),
                 )
         conn.commit()
+    return new_id
 
 
 def get_conversation_title(conversation_id: str) -> str:
@@ -488,6 +500,70 @@ async def get_messages(
             rows.append(msg)
 
     return api_ok(data={"messages": rows})
+
+
+@router.delete(
+    "/conversations/{conv_id}/messages/{msg_id}",
+    response_model=ApiResponse,
+    response_model_exclude_none=True,
+)
+async def delete_message(
+    request: Request,
+    conv_id: str,
+    msg_id: int,
+    user: dict = Depends(require_user),
+):
+    """Hard-delete a single webchat message. Superadmin only.
+
+    Writes an entry to admin.audit_log with role + content length but NOT
+    the content itself — the column is encrypted at rest and the typical
+    reason for deletion is sensitive data, so leaking the plaintext into
+    a separate log defeats the purpose. Use a backup if recovery is
+    needed.
+    """
+    if not user.get("is_superadmin"):
+        return api_error(403, "Superadmin only", "forbidden")
+
+    _ensure_db()
+    with _db.acquire_sync() as conn:
+        row = conn.execute(
+            "SELECT role, length(content) AS content_len "
+            "FROM chat.webchat_messages "
+            "WHERE id = %s AND conversation_id = %s",
+            (msg_id, conv_id),
+        ).fetchone()
+        if not row:
+            return api_error(404, "Not found", "not_found")
+        conn.execute(
+            "DELETE FROM chat.webchat_messages WHERE id = %s",
+            (msg_id,),
+        )
+        conn.commit()
+
+    try:
+        from ui.auth.database import AuthDatabase
+
+        AuthDatabase().log_event(
+            event_type="webchat_message_delete",
+            user_id=user.get("id"),
+            username=user.get("username"),
+            ip_address=request.client.host if request.client else None,
+            success=True,
+            details=json.dumps(
+                {
+                    "conv_id": conv_id,
+                    "msg_id": msg_id,
+                    "role": row["role"],
+                    "content_length": row["content_len"],
+                }
+            ),
+        )
+    except Exception as exc:
+        # Audit-log failure must not roll back the deletion (already
+        # committed) but should be visible to operators.
+        logger.warning("audit log for webchat_message_delete failed: %s", exc)
+
+    return api_ok()
 
 
 @router.post(

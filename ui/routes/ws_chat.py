@@ -274,16 +274,43 @@ def _save_message(
     role: str,
     content: str,
     sender_id: str | None = None,
-):
-    """Persist a message if conversation tracking is active."""
+) -> int | None:
+    """Persist a message if conversation tracking is active.
+
+    Returns the new ``chat.webchat_messages.id`` (or ``None`` if no save
+    happened) so the caller can broadcast a ``message_persisted`` event
+    that lets clients backfill ``msg.dbId`` on the locally-pushed copy
+    of the same message — required for the per-message DELETE endpoint.
+    """
     if not conversation_id or not content:
-        return
+        return None
     try:
         from ui.routes.chat_api import save_message
 
-        save_message(conversation_id, role, content, sender_id=sender_id)
+        return save_message(conversation_id, role, content, sender_id=sender_id)
     except Exception as e:
         logger.warning(f"WebChat: failed to save message: {e}")
+        return None
+
+
+async def _broadcast_persisted(
+    conversation_id: str | None, role: str, db_id: int | None
+) -> None:
+    """Tell every viewer of the conversation the DB id of the last save.
+
+    Frontend uses this to attach ``dbId`` to the most recent message of
+    matching role that doesn't have one yet (i.e. the one just rendered
+    locally from the WS event stream).
+    """
+    if not conversation_id or db_id is None:
+        return
+    try:
+        await broadcast_to_conversation(
+            conversation_id,
+            {"type": "message_persisted", "id": db_id, "role": role},
+        )
+    except Exception as exc:
+        logger.warning(f"WebChat: persisted broadcast failed: {exc}")
 
 
 MAX_AUTO_CONTINUE = 20
@@ -478,7 +505,10 @@ async def ws_chat(websocket: WebSocket):
                 save_text = text
                 if attachments and not text:
                     save_text = "[allegato]"
-                _save_message(conversation_id, "user", save_text, sender_id=uid)
+                user_db_id = _save_message(
+                    conversation_id, "user", save_text, sender_id=uid
+                )
+                await _broadcast_persisted(conversation_id, "user", user_db_id)
 
                 # Broadcast user_message to other viewers
                 logger.info(
@@ -565,7 +595,8 @@ async def ws_chat(websocket: WebSocket):
                                 lock.release()
 
                         if result:
-                            _save_message(_conv_id, "assistant", result)
+                            asst_db_id = _save_message(_conv_id, "assistant", result)
+                            await _broadcast_persisted(_conv_id, "agent", asst_db_id)
                             # Send unread to all participants not viewing
                             if _conv_id:
                                 try:
@@ -631,12 +662,13 @@ async def ws_chat(websocket: WebSocket):
                                     "WebChat: auto-continue plan "
                                     f"conv={_conv_id[:8]}..."
                                 )
-                                _save_message(
+                                auto_db_id = _save_message(
                                     _conv_id,
                                     "user",
                                     auto_msg,
                                     sender_id="system",
                                 )
+                                await _broadcast_persisted(_conv_id, "user", auto_db_id)
                                 await broadcast_to_conversation(
                                     _conv_id, {"type": "typing"}
                                 )
@@ -648,7 +680,12 @@ async def ws_chat(websocket: WebSocket):
                                     _conv_id,
                                 )
                                 if cont_result:
-                                    _save_message(_conv_id, "assistant", cont_result)
+                                    cont_db_id = _save_message(
+                                        _conv_id, "assistant", cont_result
+                                    )
+                                    await _broadcast_persisted(
+                                        _conv_id, "agent", cont_db_id
+                                    )
                                 else:
                                     break
 
