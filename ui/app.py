@@ -326,6 +326,14 @@ class _ContextMiddleware:
                 logger.debug("Tenant context setup: %s", exc)
 
         # ── 2. Role-based access enforcement ────────────────────────
+        # The artifacts plugin's public surface uses capability URLs
+        # (?t=<hmac>&s=<share>) verified inside the route by
+        # plugins/artifacts/api/routes.py::_check_access. Without
+        # /artifacts/ in this list, logged-in non-superadmins were
+        # redirected to /me before the route ever ran, breaking
+        # owner-clicks on share links — see gridbeario/gridbear#158.
+        # Trailing slash keeps admin paths like /plugin/artifacts/*
+        # under the role check.
         public_prefixes = (
             "/auth/",
             "/static/",
@@ -334,6 +342,7 @@ class _ContextMiddleware:
             "/ws/",
             "/.well-known/",
             "/notifications",
+            "/artifacts/",
         )
         is_public = any(path.startswith(p) for p in public_prefixes) or path == "/mcp"
 
