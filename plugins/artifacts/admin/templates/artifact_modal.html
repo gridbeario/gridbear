@@ -57,8 +57,13 @@ function artifactModal() {
 
 <script>
 (function() {
-  // Matches an absolute or relative artifact URL with a uuid and hex token.
-  const ARTIFACT_RE = /(https?:\/\/[^\s<"'()]+\/artifacts\/[0-9a-f-]{36}\?t=[0-9a-f]{32}|\/artifacts\/[0-9a-f-]{36}\?t=[0-9a-f]{32})/gi;
+  // Matches absolute or relative artifact URLs. The optional `&s=<share>`
+  // tail must be captured too: without it the iframe loads the artifact via
+  // the cookie path (sandbox + SameSite=strict on HTTPS drops the session
+  // cookie -> 303 to /auth/login -> /me dashboard renders inside the modal).
+  // With the share token, _check_access takes the capability path and the
+  // cookie state stops mattering. See gridbeario/gridbear#156.
+  const ARTIFACT_RE = /((?:https?:\/\/[^\s<"'()]+)?\/artifacts\/[0-9a-f-]{36}\?t=[0-9a-f]{32}(?:&s=[A-Za-z0-9_-]+)?)/gi;
 
   function extractUrls(text) {
     if (!text) return [];
