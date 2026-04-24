@@ -94,7 +94,7 @@ async def list_models(_auth: dict = Depends(require_api_auth)):
         return api_error(403, "REST API is disabled", "forbidden")
 
     result = []
-    for model_cls in Registry.get_models():
+    for model_cls in Registry.get_visible_models():
         key = f"{model_cls._schema}.{model_cls._name}"
         if is_model_visible(key):
             result.append(
