@@ -596,6 +596,14 @@
                                               :class="msg.role === 'user' ? 'text-frost-500' : msg.role === 'other_user' ? 'text-amber-500' : 'text-nordic-500'"
                                               x-text="msg.role === 'user' ? '{{ user.display_name or user.username }}' : msg.role === 'other_user' ? msg.display_name : msg.agent || selectedAgent"></span>
                                         <span class="text-[10px] text-void-400" x-text="msg.time"></span>
+                                        <template x-if="isSuperadmin && msg.id">
+                                            <button @click="deleteMessage(msg)"
+                                                    :title="i18n.deleteMessageTooltip"
+                                                    class="ml-auto text-[10px] text-void-300 hover:text-red-500 transition-colors p-1 -m-1"
+                                                    aria-label="Delete message">
+                                                <i class="fas fa-trash-can"></i>
+                                            </button>
+                                        </template>
                                     </div>
                                     <!-- Attachment thumbnails in message -->
                                     <template x-if="msg.attachments && msg.attachments.length">
@@ -752,6 +760,8 @@ window.i18n = {
     attachFile: {{ _("Attach file")|tojson }},
     dropFilesHere: {{ _("Drop files here")|tojson }},
     deleteConfirm: {{ _("Delete this conversation?")|tojson }},
+    deleteMessageConfirm: {{ _("Delete this message? This cannot be undone.")|tojson }},
+    deleteMessageTooltip: {{ _("Delete this message (admin only)")|tojson }},
     renamePrompt: {{ _("Rename conversation:")|tojson }},
     error: {{ _("Error:")|tojson }},
     toolCall: {{ _("Tool call")|tojson }},
@@ -764,6 +774,7 @@ window.i18n = {
 <script>
 function chatApp() {
     return {
+        isSuperadmin: {{ user.is_superadmin|tojson }},
         selectedAgent: '{{ agents[0].name if agents else '' }}',
         agentNames: { {% for agent in agents %}'{{ agent.name }}': '{{ agent.display_name or agent.name }}'{% if not loop.last %}, {% endif %}{% endfor %} },
         messages: [],
@@ -1163,6 +1174,22 @@ function chatApp() {
                         self._clearPendingFiles();
                         if (self.ws) { self.ws.close(); self.ws = null; }
                     }
+                }
+            });
+        },
+
+        deleteMessage(msg) {
+            if (!this.isSuperadmin || !msg || !msg.id || !this.activeConversationId) return;
+            if (!confirm(i18n.deleteMessageConfirm)) return;
+            var self = this;
+            fetch('/me/chat/api/conversations/' + this.activeConversationId + '/messages/' + msg.id, {
+                method: 'DELETE',
+                headers: self._apiHeaders(),
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.ok) {
+                    self.messages = self.messages.filter(function(m) { return m.id !== msg.id; });
                 }
             });
         },
