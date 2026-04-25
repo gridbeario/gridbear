@@ -30,6 +30,10 @@ class PullModelRequest(BaseModel):
     name: str
 
 
+class DeleteModelRequest(BaseModel):
+    name: str
+
+
 @router.get(
     "/models",
     response_model=ApiResponse[dict],
@@ -236,6 +240,45 @@ async def pull_model(
         return api_error(e.response.status_code, msg, "pull_error")
     except Exception as e:
         logger.error("Ollama pull error: %s", e)
+        return api_error(500, str(e), "internal_error")
+
+
+@router.post(
+    "/delete",
+    response_model=ApiResponse,
+    response_model_exclude_none=True,
+)
+async def delete_model(
+    request: DeleteModelRequest,
+    _auth: None = Depends(verify_internal_auth),
+):
+    """Delete a locally-cached model via Ollama's DELETE /api/delete.
+
+    Useful when the operator pulled a model that turns out to be
+    paid-only on Ollama Cloud, or just to free disk space without
+    needing to drop into a shell.
+    """
+    host, _ = _get_ollama_host()
+    model_name = request.name.strip()
+    if not model_name:
+        return api_error(400, "Model name is required", "validation_error")
+
+    logger.info("Ollama delete requested: %s", model_name)
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=10)) as client:
+            resp = await client.request(
+                "DELETE", f"{host}/api/delete", json={"name": model_name}
+            )
+            resp.raise_for_status()
+        logger.info("Ollama delete complete: %s", model_name)
+        return api_ok(model=model_name)
+    except httpx.HTTPStatusError as e:
+        msg = str(e)
+        if e.response.status_code == 404:
+            msg = f"Model '{model_name}' not installed locally"
+        return api_error(e.response.status_code, msg, "delete_error")
+    except Exception as e:
+        logger.error("Ollama delete error: %s", e)
         return api_error(500, str(e), "internal_error")
 
 

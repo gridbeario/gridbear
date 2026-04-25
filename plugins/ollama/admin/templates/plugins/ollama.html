@@ -247,12 +247,27 @@
                         {% endif %}
                     </div>
                 </div>
-                <div class="flex items-center gap-4 text-sm text-void-500 dark:text-void-400">
+                <div class="flex items-center gap-3 text-sm text-void-500 dark:text-void-400">
                     {% if model.size_gb > 0 %}
                     <span class="tabular-nums">{{ "%.1f"|format(model.size_gb) }} GB</span>
                     {% else %}
                     <span class="text-void-400">—</span>
                     {% endif %}
+                    {% set is_default = model.name == health.configured_model or model.name == health.configured_model ~ ':latest' or model.name.startswith(health.configured_model ~ ':') %}
+                    {% if not is_default %}
+                    <button type="button"
+                            onclick="setDefaultModel(this, '{{ model.name|e }}')"
+                            title="Set as default model"
+                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-void-400 hover:text-nordic-500 hover:bg-nordic-500/10 transition-colors">
+                        <i class="far fa-star text-sm"></i>
+                    </button>
+                    {% endif %}
+                    <button type="button"
+                            onclick="deleteModel(this, '{{ model.name|e }}')"
+                            title="Remove this model from local Ollama"
+                            class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-void-400 hover:text-ember-500 hover:bg-ember-500/10 transition-colors">
+                        <i class="fas fa-trash-can text-sm"></i>
+                    </button>
                 </div>
             </div>
             {% endfor %}
@@ -347,6 +362,67 @@ async function pullModel() {
 document.getElementById('pull-model-name')?.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); pullModel(); }
 });
+
+function _csrfToken() {
+    return document.getElementById('csrf-token')
+        ? document.getElementById('csrf-token').value
+        : (document.querySelector('[name=csrf_token]')?.value || '');
+}
+
+async function setDefaultModel(btn, name) {
+    btn.disabled = true;
+    const icon = btn.querySelector('i');
+    const prevIcon = icon.className;
+    icon.className = 'fas fa-spinner fa-spin text-sm';
+    try {
+        const resp = await fetch('/plugins/ollama/set-default', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+            body: JSON.stringify({name})
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            location.reload();
+        } else {
+            alert('Failed to set default: ' + (data.error || 'unknown error'));
+            icon.className = prevIcon;
+            btn.disabled = false;
+        }
+    } catch (err) {
+        alert('Network error: ' + err.message);
+        icon.className = prevIcon;
+        btn.disabled = false;
+    }
+}
+
+async function deleteModel(btn, name) {
+    if (!confirm('Remove model "' + name + '" from local Ollama? This frees disk space; you can pull it again later.')) {
+        return;
+    }
+    btn.disabled = true;
+    const icon = btn.querySelector('i');
+    const prevIcon = icon.className;
+    icon.className = 'fas fa-spinner fa-spin text-sm';
+    try {
+        const resp = await fetch('/plugins/ollama/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+            body: JSON.stringify({name})
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            location.reload();
+        } else {
+            alert('Failed to delete: ' + (data.error || 'unknown error'));
+            icon.className = prevIcon;
+            btn.disabled = false;
+        }
+    } catch (err) {
+        alert('Network error: ' + err.message);
+        icon.className = prevIcon;
+        btn.disabled = false;
+    }
+}
 
 function ollamaAuth() {
     return {
