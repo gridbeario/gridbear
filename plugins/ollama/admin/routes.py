@@ -147,3 +147,62 @@ async def ollama_pull_model(request: Request, _: bool = Depends(require_login)):
     except Exception as exc:
         logger.error("Ollama pull proxy error: %s", exc)
         return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@router.post("/delete")
+async def ollama_delete_model(request: Request, _: bool = Depends(require_login)):
+    """Proxy model delete to the bot's Ollama API.
+
+    Mirrors the pull surface so operators can remove a model from the
+    admin UI instead of reaching for ``docker exec ... ollama rm``.
+    Typical use: a model was pulled but turns out to require a paid
+    Ollama Cloud subscription, or just freeing disk space.
+    """
+    body = await request.json()
+    model_name = (body.get("name") or "").strip()
+    if not model_name:
+        return JSONResponse(
+            {"ok": False, "error": "Model name is required"}, status_code=400
+        )
+
+    url = f"{GRIDBEAR_URL}/api/ollama/delete"
+    headers = {
+        "Authorization": f"Bearer {INTERNAL_SECRET}",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=10)) as client:
+            resp = await client.post(url, json={"name": model_name}, headers=headers)
+            return JSONResponse(resp.json(), status_code=resp.status_code)
+    except Exception as exc:
+        logger.error("Ollama delete proxy error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)
+
+
+@router.post("/set-default")
+async def ollama_set_default_model(request: Request, _: bool = Depends(require_login)):
+    """Promote a locally-installed model to the plugin's default.
+
+    Avoids the operator having to scroll through the Configuration form
+    just to flip one field — the typical "I just pulled a new model and
+    want to try it" workflow becomes a one-click promotion from the
+    Available Models list.
+    """
+    body = await request.json()
+    model_name = (body.get("name") or "").strip()
+    if not model_name:
+        return JSONResponse(
+            {"ok": False, "error": "Model name is required"}, status_code=400
+        )
+
+    try:
+        from ui.plugin_helpers import load_plugin_config, save_plugin_config
+
+        config = load_plugin_config("ollama")
+        config["model"] = model_name
+        save_plugin_config("ollama", config)
+        logger.info("Ollama default model set to: %s", model_name)
+        return JSONResponse({"ok": True, "model": model_name})
+    except Exception as exc:
+        logger.error("Ollama set-default error: %s", exc)
+        return JSONResponse({"ok": False, "error": str(exc)}, status_code=500)

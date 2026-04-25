@@ -30,6 +30,10 @@ class PullModelRequest(BaseModel):
     name: str
 
 
+class DeleteModelRequest(BaseModel):
+    name: str
+
+
 @router.get(
     "/models",
     response_model=ApiResponse[dict],
@@ -62,16 +66,18 @@ async def set_models(
     return api_ok(count=len(models))
 
 
-@router.post(
-    "/models/refresh",
-    response_model=ApiResponse,
-    response_model_exclude_none=True,
-)
-async def refresh_models(_auth: None = Depends(verify_internal_auth)):
-    """Refresh model list from local Ollama instance (/api/tags)."""
+async def _sync_registry_from_ollama() -> int | None:
+    """Pull `ollama list` and overwrite the GridBear models registry.
+
+    Returns the number of models synced, or ``None`` on failure. Used both
+    by the explicit /models/refresh endpoint and as a fire-and-forget
+    follow-up after pull/delete so the agent dropdown stays in lock-step
+    with what's actually installed locally — without this, the operator
+    pulls a model and then has to remember to also click "Refresh" in the
+    Models registry section to make it pickable on agents.
+    """
     from core.registry import get_plugin_manager
 
-    # Get Ollama host from plugin config
     pm = get_plugin_manager()
     host = "http://ollama:11434"
     if pm:
@@ -90,7 +96,6 @@ async def refresh_models(_auth: None = Depends(verify_internal_auth)):
             name = m.get("name", "")
             # Format: "qwen3:8b" → "Qwen3 8B"
             display = name.replace(":", " ").replace("-", " ").title()
-            # Add size info if available
             size_gb = m.get("size", 0) / (1024**3)
             if size_gb > 0.1:
                 display += f" ({size_gb:.1f} GB)"
@@ -101,14 +106,36 @@ async def refresh_models(_auth: None = Depends(verify_internal_auth)):
         registry = get_models_registry()
         if registry:
             registry.set_models("ollama", models, source="api")
-        return api_ok(count=len(models))
+        return len(models)
     except Exception as e:
-        logger.error("Ollama models refresh error: %s", e)
-        return api_error(500, str(e), "internal_error")
+        logger.warning("Ollama registry sync failed: %s", e)
+        return None
+
+
+@router.post(
+    "/models/refresh",
+    response_model=ApiResponse,
+    response_model_exclude_none=True,
+)
+async def refresh_models(_auth: None = Depends(verify_internal_auth)):
+    """Refresh model list from local Ollama instance (/api/tags)."""
+    count = await _sync_registry_from_ollama()
+    if count is None:
+        return api_error(500, "Ollama registry sync failed", "internal_error")
+    return api_ok(count=count)
 
 
 def _get_ollama_host() -> tuple[str, str]:
-    """Return (host, configured_model) from the running Ollama runner."""
+    """Return (host, configured_model).
+
+    The host comes from the running runner instance (env-var overridable
+    at boot, doesn't change at runtime). The configured_model is read
+    fresh from the plugin registry on every call — without this re-read,
+    setting the default via /plugins/ollama/set-default would persist
+    to the DB but the health endpoint would keep returning the boot-time
+    snapshot until a container restart, leaving the admin UI's "default"
+    badge on the wrong model.
+    """
     from core.registry import get_plugin_manager
 
     pm = get_plugin_manager()
@@ -121,6 +148,19 @@ def _get_ollama_host() -> tuple[str, str]:
                 host = ollama.host
             if hasattr(ollama, "model"):
                 model = ollama.model
+
+    # Override model with the latest persisted value so set-default takes
+    # effect immediately without restart. Falls back to runner snapshot if
+    # the registry read fails for any reason.
+    try:
+        from ui.plugin_helpers import load_plugin_config
+
+        cfg = load_plugin_config("ollama")
+        if cfg and cfg.get("model"):
+            model = cfg["model"]
+    except Exception as exc:
+        logger.debug("ollama _get_ollama_host config re-read failed: %s", exc)
+
     return host, model
 
 
@@ -223,6 +263,10 @@ async def pull_model(
 
         if "success" in str(last_status.get("status", "")):
             logger.info("Ollama pull complete: %s", model_name)
+            # Auto-sync the GridBear registry so the new model shows up in
+            # agent dropdowns without the operator needing a separate
+            # "Refresh" click in the Models section.
+            await _sync_registry_from_ollama()
             return api_ok(model=model_name)
         return api_error(
             500, f"Pull ended without success: {last_status}", "pull_error"
@@ -236,6 +280,48 @@ async def pull_model(
         return api_error(e.response.status_code, msg, "pull_error")
     except Exception as e:
         logger.error("Ollama pull error: %s", e)
+        return api_error(500, str(e), "internal_error")
+
+
+@router.post(
+    "/delete",
+    response_model=ApiResponse,
+    response_model_exclude_none=True,
+)
+async def delete_model(
+    request: DeleteModelRequest,
+    _auth: None = Depends(verify_internal_auth),
+):
+    """Delete a locally-cached model via Ollama's DELETE /api/delete.
+
+    Useful when the operator pulled a model that turns out to be
+    paid-only on Ollama Cloud, or just to free disk space without
+    needing to drop into a shell.
+    """
+    host, _ = _get_ollama_host()
+    model_name = request.name.strip()
+    if not model_name:
+        return api_error(400, "Model name is required", "validation_error")
+
+    logger.info("Ollama delete requested: %s", model_name)
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=10)) as client:
+            resp = await client.request(
+                "DELETE", f"{host}/api/delete", json={"name": model_name}
+            )
+            resp.raise_for_status()
+        logger.info("Ollama delete complete: %s", model_name)
+        # Same registry-sync rationale as in pull above — keep the agent
+        # dropdown in lock-step with the actual local install.
+        await _sync_registry_from_ollama()
+        return api_ok(model=model_name)
+    except httpx.HTTPStatusError as e:
+        msg = str(e)
+        if e.response.status_code == 404:
+            msg = f"Model '{model_name}' not installed locally"
+        return api_error(e.response.status_code, msg, "delete_error")
+    except Exception as e:
+        logger.error("Ollama delete error: %s", e)
         return api_error(500, str(e), "internal_error")
 
 
