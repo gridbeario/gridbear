@@ -227,7 +227,7 @@ async def create_record(
         return api_error(403, "REST API is disabled", "forbidden")
 
     model_cls, schema, name = _resolve_model(model_path)
-    _require_access(model_path, "write")
+    _require_access(model_path, "create")
 
     body = await request.json()
     values = body.get("values", {})

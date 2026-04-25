@@ -73,6 +73,12 @@
                     <span class="text-sm text-void-700 dark:text-void-200">Read</span>
                 </label>
                 <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" name="create_*"
+                           {% if wildcard_perms.create %}checked{% endif %}
+                           class="w-4 h-4 rounded border-void-300 dark:border-void-600 text-nordic-500 focus:ring-nordic-500/30 bg-void-50 dark:bg-void-800">
+                    <span class="text-sm text-void-700 dark:text-void-200">Create</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="write_*"
                            {% if wildcard_perms.write %}checked{% endif %}
                            class="w-4 h-4 rounded border-void-300 dark:border-void-600 text-nordic-500 focus:ring-nordic-500/30 bg-void-50 dark:bg-void-800">
@@ -131,6 +137,13 @@
                                :disabled="denied"
                                class="w-4 h-4 rounded border-void-300 dark:border-void-600 text-nordic-500 focus:ring-nordic-500/30 bg-void-50 dark:bg-void-800">
                         <span class="text-xs text-void-500 dark:text-void-400">R</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer" :class="denied ? 'opacity-30 pointer-events-none' : ''">
+                        <input type="checkbox" name="create_{{ m.key }}"
+                               {% if m.perms.create and not m.perms.denied %}checked{% endif %}
+                               :disabled="denied"
+                               class="w-4 h-4 rounded border-void-300 dark:border-void-600 text-nordic-500 focus:ring-nordic-500/30 bg-void-50 dark:bg-void-800">
+                        <span class="text-xs text-void-500 dark:text-void-400">C</span>
                     </label>
                     <label class="flex items-center gap-1.5 cursor-pointer" :class="denied ? 'opacity-30 pointer-events-none' : ''">
                         <input type="checkbox" name="write_{{ m.key }}"

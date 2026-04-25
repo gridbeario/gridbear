@@ -42,7 +42,9 @@ def _get_model_rule(model_key: str) -> dict | bool | None:
     Returns:
         - False: model is explicitly denied
         - True: full access
-        - dict with {read, write, delete}: granular access
+        - dict with {read, create, write, delete}: granular access
+          (``create`` is optional; falls back to ``write`` for rules
+          predating the create/write split)
         - None: no rule found (will fall back to wildcard or deny)
     """
     config = _load_config()
@@ -65,10 +67,15 @@ def check_access(model_key: str, operation: str) -> bool:
 
     Args:
         model_key: e.g. 'public.admin_users'
-        operation: one of 'read', 'write', 'delete'
+        operation: one of 'read', 'create', 'write', 'delete'
 
     Returns:
         True if the operation is allowed.
+
+    Backward compat: rules predating the create/write split don't carry
+    a ``create`` key. For those, ``create`` falls back to ``write`` so
+    upgrading the codebase doesn't silently revoke POST access on
+    models the operator already authorized for write.
     """
     rule = _get_model_rule(model_key)
 
@@ -82,6 +89,8 @@ def check_access(model_key: str, operation: str) -> bool:
 
     # Dict → granular check
     if isinstance(rule, dict):
+        if operation == "create" and "create" not in rule:
+            return bool(rule.get("write", False))
         return bool(rule.get(operation, False))
 
     return False
