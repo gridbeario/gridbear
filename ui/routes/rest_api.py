@@ -68,20 +68,42 @@ def _get_orm_models() -> list[dict]:
 
 
 def _rule_to_perms(rule) -> dict:
-    """Convert an ACL rule to a permissions dict."""
+    """Convert an ACL rule to a permissions dict.
+
+    ``create`` is treated as separate from ``write`` (POST vs PATCH at
+    the router level). For rules predating the split that don't carry
+    a ``create`` key, fall back to the ``write`` value so the checkbox
+    pre-fills sensibly and a save round-trip doesn't accidentally
+    revoke create access.
+    """
+    denied = {
+        "denied": True,
+        "read": False,
+        "create": False,
+        "write": False,
+        "delete": False,
+    }
     if rule is False:
-        return {"denied": True, "read": False, "write": False, "delete": False}
+        return denied
     if rule is True:
-        return {"denied": False, "read": True, "write": True, "delete": True}
+        return {
+            "denied": False,
+            "read": True,
+            "create": True,
+            "write": True,
+            "delete": True,
+        }
     if isinstance(rule, dict):
+        write_val = bool(rule.get("write", False))
         return {
             "denied": False,
             "read": bool(rule.get("read", False)),
-            "write": bool(rule.get("write", False)),
+            "create": bool(rule.get("create", write_val)),
+            "write": write_val,
             "delete": bool(rule.get("delete", False)),
         }
     # No rule = denied
-    return {"denied": True, "read": False, "write": False, "delete": False}
+    return denied
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -141,24 +163,28 @@ async def save_config(request: Request, _=Depends(require_login)):
             models_config[key] = False
         else:
             read = form.get(f"read_{key}") == "on"
+            create = form.get(f"create_{key}") == "on"
             write = form.get(f"write_{key}") == "on"
             delete = form.get(f"delete_{key}") == "on"
             # Only store explicit rules (skip models that match wildcard)
-            if not read and not write and not delete:
+            if not read and not create and not write and not delete:
                 models_config[key] = False
             else:
                 models_config[key] = {
                     "read": read,
+                    "create": create,
                     "write": write,
                     "delete": delete,
                 }
 
     # Wildcard rule
     wc_read = form.get("read_*") == "on"
+    wc_create = form.get("create_*") == "on"
     wc_write = form.get("write_*") == "on"
     wc_delete = form.get("delete_*") == "on"
     models_config["*"] = {
         "read": wc_read,
+        "create": wc_create,
         "write": wc_write,
         "delete": wc_delete,
     }
