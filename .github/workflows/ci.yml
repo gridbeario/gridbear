@@ -130,7 +130,11 @@ jobs:
           pip install --upgrade "setuptools>=78.1.1"
 
       - name: Dependency vulnerability scan
-        run: pip-audit --desc --skip-editable --ignore-vuln CVE-2026-4539  # pygments regex DoS, local-only
+        # CVE-2026-3219: pip <=26.0.1 conflates concatenated tar+ZIP files.
+        # No fix release as of 2026-04-25; only triggered by malicious package
+        # archives during install — we pin our own deps and don't install
+        # arbitrary user input, so the path isn't reachable in our runtime.
+        run: pip-audit --desc --skip-editable --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219  # pygments regex DoS + pip tar/zip confusion
 
       - name: Secret scan
         run: |
