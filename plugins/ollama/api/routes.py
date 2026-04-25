@@ -112,7 +112,16 @@ async def refresh_models(_auth: None = Depends(verify_internal_auth)):
 
 
 def _get_ollama_host() -> tuple[str, str]:
-    """Return (host, configured_model) from the running Ollama runner."""
+    """Return (host, configured_model).
+
+    The host comes from the running runner instance (env-var overridable
+    at boot, doesn't change at runtime). The configured_model is read
+    fresh from the plugin registry on every call — without this re-read,
+    setting the default via /plugins/ollama/set-default would persist
+    to the DB but the health endpoint would keep returning the boot-time
+    snapshot until a container restart, leaving the admin UI's "default"
+    badge on the wrong model.
+    """
     from core.registry import get_plugin_manager
 
     pm = get_plugin_manager()
@@ -125,6 +134,19 @@ def _get_ollama_host() -> tuple[str, str]:
                 host = ollama.host
             if hasattr(ollama, "model"):
                 model = ollama.model
+
+    # Override model with the latest persisted value so set-default takes
+    # effect immediately without restart. Falls back to runner snapshot if
+    # the registry read fails for any reason.
+    try:
+        from ui.plugin_helpers import load_plugin_config
+
+        cfg = load_plugin_config("ollama")
+        if cfg and cfg.get("model"):
+            model = cfg["model"]
+    except Exception as exc:
+        logger.debug("ollama _get_ollama_host config re-read failed: %s", exc)
+
     return host, model
 
 

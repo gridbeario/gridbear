@@ -363,21 +363,22 @@ document.getElementById('pull-model-name')?.addEventListener('keydown', function
     if (e.key === 'Enter') { e.preventDefault(); pullModel(); }
 });
 
-function _csrfToken() {
-    return document.getElementById('csrf-token')
-        ? document.getElementById('csrf-token').value
-        : (document.querySelector('[name=csrf_token]')?.value || '');
-}
-
+// Inline CSRF token lookup — earlier we extracted this into a helper
+// `_csrfToken()` but the name collides with a global of the same name
+// declared by the CSRF partial loaded site-wide. The collision threw
+// `SyntaxError: Identifier '_csrfToken' has already been declared`,
+// aborting the whole script and leaving every function in this block
+// (ollamaAuth, deleteModel, setDefaultModel, pullModel) undefined.
 async function setDefaultModel(btn, name) {
     btn.disabled = true;
     const icon = btn.querySelector('i');
     const prevIcon = icon.className;
     icon.className = 'fas fa-spinner fa-spin text-sm';
+    const csrf = document.querySelector('[name=csrf_token]')?.value || '';
     try {
         const resp = await fetch('/plugins/ollama/set-default', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify({name})
         });
         const data = await resp.json();
@@ -403,10 +404,11 @@ async function deleteModel(btn, name) {
     const icon = btn.querySelector('i');
     const prevIcon = icon.className;
     icon.className = 'fas fa-spinner fa-spin text-sm';
+    const csrf = document.querySelector('[name=csrf_token]')?.value || '';
     try {
         const resp = await fetch('/plugins/ollama/delete', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
             body: JSON.stringify({name})
         });
         const data = await resp.json();
