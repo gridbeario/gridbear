@@ -66,16 +66,18 @@ async def set_models(
     return api_ok(count=len(models))
 
 
-@router.post(
-    "/models/refresh",
-    response_model=ApiResponse,
-    response_model_exclude_none=True,
-)
-async def refresh_models(_auth: None = Depends(verify_internal_auth)):
-    """Refresh model list from local Ollama instance (/api/tags)."""
+async def _sync_registry_from_ollama() -> int | None:
+    """Pull `ollama list` and overwrite the GridBear models registry.
+
+    Returns the number of models synced, or ``None`` on failure. Used both
+    by the explicit /models/refresh endpoint and as a fire-and-forget
+    follow-up after pull/delete so the agent dropdown stays in lock-step
+    with what's actually installed locally — without this, the operator
+    pulls a model and then has to remember to also click "Refresh" in the
+    Models registry section to make it pickable on agents.
+    """
     from core.registry import get_plugin_manager
 
-    # Get Ollama host from plugin config
     pm = get_plugin_manager()
     host = "http://ollama:11434"
     if pm:
@@ -94,7 +96,6 @@ async def refresh_models(_auth: None = Depends(verify_internal_auth)):
             name = m.get("name", "")
             # Format: "qwen3:8b" → "Qwen3 8B"
             display = name.replace(":", " ").replace("-", " ").title()
-            # Add size info if available
             size_gb = m.get("size", 0) / (1024**3)
             if size_gb > 0.1:
                 display += f" ({size_gb:.1f} GB)"
@@ -105,10 +106,23 @@ async def refresh_models(_auth: None = Depends(verify_internal_auth)):
         registry = get_models_registry()
         if registry:
             registry.set_models("ollama", models, source="api")
-        return api_ok(count=len(models))
+        return len(models)
     except Exception as e:
-        logger.error("Ollama models refresh error: %s", e)
-        return api_error(500, str(e), "internal_error")
+        logger.warning("Ollama registry sync failed: %s", e)
+        return None
+
+
+@router.post(
+    "/models/refresh",
+    response_model=ApiResponse,
+    response_model_exclude_none=True,
+)
+async def refresh_models(_auth: None = Depends(verify_internal_auth)):
+    """Refresh model list from local Ollama instance (/api/tags)."""
+    count = await _sync_registry_from_ollama()
+    if count is None:
+        return api_error(500, "Ollama registry sync failed", "internal_error")
+    return api_ok(count=count)
 
 
 def _get_ollama_host() -> tuple[str, str]:
@@ -249,6 +263,10 @@ async def pull_model(
 
         if "success" in str(last_status.get("status", "")):
             logger.info("Ollama pull complete: %s", model_name)
+            # Auto-sync the GridBear registry so the new model shows up in
+            # agent dropdowns without the operator needing a separate
+            # "Refresh" click in the Models section.
+            await _sync_registry_from_ollama()
             return api_ok(model=model_name)
         return api_error(
             500, f"Pull ended without success: {last_status}", "pull_error"
@@ -293,6 +311,9 @@ async def delete_model(
             )
             resp.raise_for_status()
         logger.info("Ollama delete complete: %s", model_name)
+        # Same registry-sync rationale as in pull above — keep the agent
+        # dropdown in lock-step with the actual local install.
+        await _sync_registry_from_ollama()
         return api_ok(model=model_name)
     except httpx.HTTPStatusError as e:
         msg = str(e)
