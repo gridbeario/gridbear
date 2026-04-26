@@ -146,7 +146,7 @@ Agent configuration is stored in PostgreSQL (`app.agent_configs`) with hot-reloa
 | **runner** | 4 | claude, openai, gemini, ollama |
 | **service** | 18 | memory, sessions, skills, attachments, voice, image, tts-* |
 | **mcp** | 7 | gmail, homeassistant, github, playwright, google-workspace |
-| **theme** | 3 | theme-nordic, theme-enterprise, theme-tailadmin |
+| **theme** | 3 | theme-nordic, theme-corporate, theme-tailadmin |
 
 Plugins are discovered via `manifest.json` in each plugin directory. Enable them from the admin UI at `/plugins` (state persisted in PostgreSQL).
 

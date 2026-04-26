@@ -1,4 +1,4 @@
-"""Enterprise Theme for GridBear Admin UI.
+"""Corporate Theme for GridBear Admin UI.
 
 Clean professional SaaS aesthetic with indigo/slate palette.
 Opaque surfaces, sharp borders, subtle shadows. No glassmorphism.
@@ -12,8 +12,8 @@ from core.interfaces.theme import BaseTheme
 PLUGIN_DIR = Path(__file__).resolve().parent
 
 
-class EnterpriseTheme(BaseTheme):
-    name = "theme-enterprise"
+class CorporateTheme(BaseTheme):
+    name = "theme-corporate"
 
     def get_css_variables(self) -> dict[str, dict[str, str]]:
         return {
@@ -166,7 +166,7 @@ class EnterpriseTheme(BaseTheme):
     def get_custom_css(self) -> str:
         return """\
 /* ==============================================
-   Enterprise Theme — global overrides
+   Corporate Theme — global overrides
    Opaque surfaces, subtle shadows, no glassmorphism
    ============================================== */
 
@@ -387,7 +387,7 @@ footer .font-semibold {
 
     def get_metadata(self) -> dict[str, str]:
         return {
-            "display_name": "Enterprise",
+            "display_name": "Corporate",
             "description": (
                 "Clean professional SaaS dashboard with indigo/slate palette"
             ),
