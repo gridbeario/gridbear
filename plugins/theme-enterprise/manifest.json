@@ -1,9 +1,0 @@
-{
-  "name": "theme-enterprise",
-  "type": "theme",
-  "version": "0.1.0",
-  "description": "Enterprise dashboard theme with indigo/slate palette and opaque surfaces",
-  "author": "GridBear",
-  "class_name": "EnterpriseTheme",
-  "entry_point": "theme.py"
-}

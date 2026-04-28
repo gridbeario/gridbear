@@ -97,16 +97,18 @@ class TestResolveModel:
     """Tests for model name resolution."""
 
     def test_short_names(self, mock_anthropic):
-        from plugins.claude.api_backend import resolve_model
+        # Resolve short names using the current default map so the test
+        # tracks new model versions instead of hardcoding outdated IDs.
+        from plugins.claude.api_backend import _DEFAULT_MODEL_MAP, resolve_model
 
-        assert resolve_model("haiku") == "claude-haiku-4-5-20251001"
-        assert resolve_model("sonnet") == "claude-sonnet-4-5-20250929"
-        assert resolve_model("opus") == "claude-opus-4-6-20250827"
+        for short, full in _DEFAULT_MODEL_MAP.items():
+            assert resolve_model(short) == full
 
     def test_full_id_passthrough(self, mock_anthropic):
         from plugins.claude.api_backend import resolve_model
 
-        full_id = "claude-sonnet-4-5-20250929"
+        # Any string that does not match a short alias is returned as-is.
+        full_id = "claude-sonnet-some-future-revision"
         assert resolve_model(full_id) == full_id
 
     def test_unknown_name_passthrough(self, mock_anthropic):

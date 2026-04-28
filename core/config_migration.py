@@ -27,6 +27,7 @@ _MARKER_DEFAULT_COMPANY = "_migration_default_company"
 _MARKER_UNIFY_USERS = "_migration_unify_users"
 _MARKER_USER_PLATFORMS = "_migration_user_platforms"
 _MARKER_SEED_LANGUAGES = "_migration_seed_languages"
+_MARKER_RENAME_THEME_ENTERPRISE = "_migration_rename_theme_enterprise_to_corporate"
 
 
 async def migrate_admin_config_to_db(config_path: Path) -> bool:
@@ -534,6 +535,32 @@ async def migrate_seed_languages() -> bool:
 
     await SystemConfig.set_param(_MARKER_SEED_LANGUAGES, True)
     logger.info("Language seed complete (en, it)")
+    return True
+
+
+async def migrate_rename_theme_enterprise_to_corporate() -> bool:
+    """Rebind active_theme from 'theme-enterprise' to 'theme-corporate'.
+
+    The legacy theme plugin was renamed to free the 'theme-enterprise' name
+    for the dedicated Enterprise design system shipped via gridbear-enterprise.
+    Existing deployments that had the legacy theme active would otherwise fall
+    back to no theme after the rename. Idempotent via SystemConfig marker.
+
+    Returns True if the rebind was performed (or skipped because not needed),
+    False only when the marker was already set on a previous boot.
+    """
+    from core.system_config import SystemConfig
+
+    marker = await SystemConfig.get_param(_MARKER_RENAME_THEME_ENTERPRISE)
+    if marker:
+        return False
+
+    current = await SystemConfig.get_param("active_theme")
+    if current == "theme-enterprise":
+        await SystemConfig.set_param("active_theme", "theme-corporate")
+        logger.info("active_theme rebound: theme-enterprise -> theme-corporate")
+
+    await SystemConfig.set_param(_MARKER_RENAME_THEME_ENTERPRISE, True)
     return True
 
 

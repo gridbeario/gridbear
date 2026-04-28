@@ -981,6 +981,7 @@ async def startup_cleanup():
                 migrate_admin_config_to_db,
                 migrate_claude_settings_to_db,
                 migrate_mcp_perms_to_unified_id,
+                migrate_rename_theme_enterprise_to_corporate,
                 migrate_rest_api_config_to_db,
                 migrate_unify_users,
                 migrate_user_platforms,
@@ -992,6 +993,7 @@ async def startup_cleanup():
                 BASE_DIR / "config" / "claude_settings.json"
             )
             await migrate_mcp_perms_to_unified_id()
+            await migrate_rename_theme_enterprise_to_corporate()
             await migrate_unify_users()
             await migrate_user_platforms()
 

@@ -1,0 +1,9 @@
+{
+  "name": "theme-corporate",
+  "type": "theme",
+  "version": "0.1.0",
+  "description": "Corporate dashboard theme with indigo/slate palette and opaque surfaces",
+  "author": "GridBear",
+  "class_name": "CorporateTheme",
+  "entry_point": "theme.py"
+}

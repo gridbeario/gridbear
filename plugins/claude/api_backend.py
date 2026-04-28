@@ -15,11 +15,13 @@ from plugins.claude.session_manager import SessionManager
 from plugins.claude.tool_adapter import ToolAdapter
 from ui.secrets_manager import secrets_manager
 
-# Fallback map when registry is unavailable
+# Fallback map when registry is unavailable. Keep in sync with
+# ClaudeRunner._DEFAULT_MODELS — same model versions, just keyed by short
+# alias instead of {id, name, api_id} triple.
 _DEFAULT_MODEL_MAP = {
     "haiku": "claude-haiku-4-5-20251001",
-    "sonnet": "claude-sonnet-4-5-20250929",
-    "opus": "claude-opus-4-6-20250827",
+    "sonnet": "claude-sonnet-4-6",
+    "opus": "claude-opus-4-7",
 }
 
 # Transient error substrings that warrant retry

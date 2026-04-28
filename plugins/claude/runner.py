@@ -133,6 +133,14 @@ class ClaudeRunner(BaseRunner):
 
         generate_all()
 
+        # Seed bundled model list on first boot so the admin UI never
+        # sees an empty dropdown. Idempotent: only writes if no entry yet.
+        from core.registry import get_models_registry
+
+        registry = get_models_registry()
+        if registry:
+            registry.seed_if_empty("claude", self._DEFAULT_MODELS)
+
         if self.backend == "api":
             from .api_backend import ClaudeApiBackend
 
@@ -180,9 +188,9 @@ class ClaudeRunner(BaseRunner):
         return True
 
     _DEFAULT_MODELS = [
-        {"id": "opus", "name": "Opus", "api_id": "claude-opus-4-6-20250827"},
-        {"id": "sonnet", "name": "Sonnet", "api_id": "claude-sonnet-4-5-20250929"},
-        {"id": "haiku", "name": "Haiku", "api_id": "claude-haiku-4-5-20251001"},
+        {"id": "opus", "name": "Opus 4.7", "api_id": "claude-opus-4-7"},
+        {"id": "sonnet", "name": "Sonnet 4.6", "api_id": "claude-sonnet-4-6"},
+        {"id": "haiku", "name": "Haiku 4.5", "api_id": "claude-haiku-4-5-20251001"},
     ]
 
     @property
@@ -192,7 +200,6 @@ class ClaudeRunner(BaseRunner):
 
         registry = get_models_registry()
         if registry:
-            registry.seed_if_empty("claude", self._DEFAULT_MODELS)
             models = registry.get_for_ui("claude")
             if models:
                 return models

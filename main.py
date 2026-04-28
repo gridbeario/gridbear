@@ -1197,6 +1197,7 @@ async def main():
                 migrate_claude_settings_to_db,
                 migrate_create_default_company,
                 migrate_mcp_perms_to_unified_id,
+                migrate_rename_theme_enterprise_to_corporate,
                 migrate_rest_api_config_to_db,
                 migrate_seed_languages,
                 migrate_unify_users,
@@ -1211,6 +1212,7 @@ async def main():
             await migrate_mcp_perms_to_unified_id()
             await migrate_create_default_company()
             await migrate_seed_languages()
+            await migrate_rename_theme_enterprise_to_corporate()
             await migrate_unify_users()
             await migrate_user_platforms()
             await migrate_agent_configs_to_db()

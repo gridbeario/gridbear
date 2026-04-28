@@ -76,5 +76,5 @@
     "token_hint": "Run <code class=\"px-1 py-0.5 rounded bg-void-100 dark:bg-void-800\">claude setup-token</code> on your local machine, then paste the token (starts with <code class=\"px-1 py-0.5 rounded bg-void-100 dark:bg-void-800\">sk-ant-oat01-</code>)",
     "token_placeholder": "sk-ant-oat01-..."
   },
-  "models_refreshable": false
+  "models_refreshable": true
 }

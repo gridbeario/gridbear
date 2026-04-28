@@ -70,6 +70,29 @@ async def set_models(
     return api_ok(count=len(models))
 
 
+@router.post(
+    "/models/refresh",
+    response_model=ApiResponse,
+    response_model_exclude_none=True,
+)
+async def refresh_models(_auth: None = Depends(verify_internal_auth)):
+    """Re-seed the Claude model list with the bundled defaults.
+
+    Anthropic does not expose a public model-listing endpoint, so the
+    canonical source is the runner's ``_DEFAULT_MODELS`` constant — kept
+    in sync with current Claude releases. Calling this endpoint
+    overwrites any local edits with the latest bundled list.
+    """
+    from plugins.claude.runner import ClaudeRunner
+
+    registry = get_models_registry()
+    if not registry:
+        return api_error(503, "Models registry not initialized", "unavailable")
+    models = ClaudeRunner._DEFAULT_MODELS
+    registry.set_models("claude", models, source="defaults")
+    return api_ok(count=len(models))
+
+
 # ── CLI Auth ──────────────────────────────────────────────────────────
 
 _CLI_BASE_ENV = {**os.environ, "HOME": "/home/gridbear"}
