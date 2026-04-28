@@ -22,15 +22,25 @@ class TestModelRegistrySeeding:
         from plugins.claude.runner import ClaudeRunner
 
         runner = ClaudeRunner({"model": "sonnet"})
+
+        # Seeding now happens inside initialize() (so a fresh install gets
+        # the registry populated before any UI access). For unit tests we
+        # invoke seed_if_empty directly to mimic that effect.
+        registry.seed_if_empty("claude", ClaudeRunner._DEFAULT_MODELS)
+
         models = runner.available_models
 
-        assert len(models) >= 3
-        assert ("sonnet", "Sonnet") in models
+        # Assertions derive from _DEFAULT_MODELS so they keep passing when
+        # Anthropic ships new versions and we bump the bundled defaults.
+        defaults = ClaudeRunner._DEFAULT_MODELS
+        assert len(models) == len(defaults)
+        for m in defaults:
+            assert (m["id"], m["name"]) in models
 
-        # Registry should now be seeded
         reg_models = registry.get_models("claude")
-        assert len(reg_models) >= 3
-        assert any(m["api_id"] == "claude-sonnet-4-5-20250929" for m in reg_models)
+        assert len(reg_models) == len(defaults)
+        for m in defaults:
+            assert any(r["api_id"] == m["api_id"] for r in reg_models)
 
     def test_ollama_runner_seeds_registry(self, registry, monkeypatch):
         monkeypatch.setattr("core.registry.get_models_registry", lambda: registry)
@@ -53,14 +63,14 @@ class TestModelRegistrySeeding:
 
         runner = ClaudeRunner({"model": "sonnet"})
 
-        # First access seeds
-        _ = runner.available_models
+        # First seed (mimics ClaudeRunner.initialize on a fresh install)
+        registry.seed_if_empty("claude", ClaudeRunner._DEFAULT_MODELS)
         assert registry.get_metadata("claude")["source"] == "seed"
 
-        # Manually update
+        # Manually update — the registry should now reflect the override
         registry.set_models("claude", [{"id": "custom", "name": "Custom"}], "manual")
 
-        # Second access uses registry, doesn't re-seed
+        # available_models reads from the registry, no implicit re-seed
         models = runner.available_models
         assert models == [("custom", "Custom")]
 
@@ -91,9 +101,13 @@ class TestModelRegistrySeeding:
         """When registry is empty, falls back to hardcoded defaults."""
         monkeypatch.setattr("core.registry.get_models_registry", lambda: None)
 
-        from plugins.claude.api_backend import resolve_model
+        from plugins.claude.api_backend import _DEFAULT_MODEL_MAP, resolve_model
 
-        assert resolve_model("sonnet") == "claude-sonnet-4-5-20250929"
+        # Assert the lookup works against the current map, not against a
+        # specific model version, so the test survives default bumps.
+        assert resolve_model("sonnet") == _DEFAULT_MODEL_MAP["sonnet"]
+        assert resolve_model("haiku") == _DEFAULT_MODEL_MAP["haiku"]
+        assert resolve_model("opus") == _DEFAULT_MODEL_MAP["opus"]
         assert resolve_model("unknown-model") == "unknown-model"
 
     def test_openai_model_map_from_registry(self, registry, monkeypatch):
