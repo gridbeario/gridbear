@@ -369,7 +369,7 @@ async def list_conversations(request: Request, user: dict = Depends(require_user
             cur = conn.execute(
                 """SELECT c.id, c.agent_name, c.title, c.created_at,
                           c.updated_at, c.type, c.context_prompt,
-                          p.pinned_at,
+                          p.pinned_at, p.role,
                           EXISTS(
                               SELECT 1 FROM chat.webchat_plans pl
                               WHERE pl.conversation_id = c.id
@@ -387,7 +387,7 @@ async def list_conversations(request: Request, user: dict = Depends(require_user
             cur = conn.execute(
                 """SELECT c.id, c.agent_name, c.title, c.created_at,
                           c.updated_at, c.type, c.context_prompt,
-                          p.pinned_at,
+                          p.pinned_at, p.role,
                           EXISTS(
                               SELECT 1 FROM chat.webchat_plans pl
                               WHERE pl.conversation_id = c.id
@@ -609,22 +609,36 @@ async def rename_conversation(
 async def delete_conversation(
     request: Request, conv_id: str, user: dict = Depends(require_user)
 ):
+    """Delete or leave a conversation depending on the caller's role.
+
+    - owner  → cascade-deletes the conversation (messages, participants,
+      attachments via FK ON DELETE CASCADE).
+    - member → removes only the caller's participant row (the conversation
+      stays alive for everyone else).
+    - none   → 404, the caller has no relationship with this conversation.
+    """
     _ensure_db()
     uid = _uid(user)
-    with _db.acquire_sync() as conn:
-        row = conn.execute(
-            "SELECT 1 FROM chat.webchat_conversations WHERE id = %s AND unified_id = %s",
-            (conv_id, uid),
-        ).fetchone()
-        if not row:
-            return api_error(404, "Not found", "not_found")
+    role = validate_conversation_access(conv_id, uid)
+    if role is None:
+        return api_error(404, "Not found", "not_found")
 
-        conn.execute(
-            "DELETE FROM chat.webchat_conversations WHERE id = %s",
-            (conv_id,),
-        )
+    with _db.acquire_sync() as conn:
+        if role == "owner":
+            conn.execute(
+                "DELETE FROM chat.webchat_conversations WHERE id = %s",
+                (conv_id,),
+            )
+            action = "deleted"
+        else:
+            conn.execute(
+                "DELETE FROM chat.webchat_participants "
+                "WHERE conversation_id = %s AND unified_id = %s",
+                (conv_id, uid),
+            )
+            action = "left"
         conn.commit()
-    return api_ok()
+    return api_ok(data={"role": role, "action": action})
 
 
 # --- Conversation context ---
