@@ -568,10 +568,18 @@ async def auth_submit_code(
         # to .credentials.json on-demand before each CLI spawn
         _save_credentials_to_secrets(oauth_block)
 
-        # Clear any stale auth error flag
-        import plugins.claude.runner as runner_mod
+        # Clear any stale auth error flag. Best-effort: the synthetic
+        # gridbear.plugins.claude namespace package set up by the MCP
+        # provider loader shadows plugins.claude with the runner.py file
+        # itself, which makes `import plugins.claude.runner` fail after
+        # the gateway has loaded the claude plugin. Don't let that block
+        # the successful login flow — credentials are already saved.
+        try:
+            import plugins.claude.runner as runner_mod
 
-        runner_mod._last_auth_error_at = 0.0
+            runner_mod._last_auth_error_at = 0.0
+        except ImportError as exc:
+            logger.debug("Could not reset auth error flag: %s", exc)
 
         logger.info("Claude OAuth login completed successfully")
         return api_ok()
