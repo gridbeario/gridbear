@@ -263,6 +263,14 @@ def _filter_by_user_mcp_permissions(tools: list[dict], unified_id: str) -> list[
         filtered = []
         for tool in tools:
             name = tool.get("name", "")
+            # Built-in virtual tools (handled inside the gateway, not by an
+            # external MCP server) are always allowed regardless of per-user
+            # permissions. Some are non-namespaced (gridbear_help, ask_agent…)
+            # and some are namespaced (conversation_docs__*, chat_history__*,
+            # credential_vault__*) — both shapes must bypass the filter.
+            if name.startswith(_BUILTIN_PREFIXES):
+                filtered.append(tool)
+                continue
             if ns_sep in name:
                 sanitized = name[: name.index(ns_sep)]
                 original = reverse_map.get(sanitized, sanitized)
