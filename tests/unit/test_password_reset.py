@@ -66,3 +66,106 @@ async def test_send_invite_email_defaults_unchanged():
 
     assert captured["subject"] == "GridBear — Set up your password"
     assert "48 hours" in captured["body"]
+
+
+def _user(**over):
+    base = {
+        "id": 42,
+        "username": "dcorio",
+        "email": "davide.corio@dubhe.it",
+        "display_name": "Davide",
+        "is_active": True,
+        "password_hash": "$2b$xx",
+    }
+    base.update(over)
+    return base
+
+
+@pytest.mark.asyncio
+async def test_reset_unknown_email_does_nothing():
+    with (
+        patch("ui.auth.password_reset.User") as mock_user,
+        patch("ui.auth.password_reset.generate_token") as mock_gen,
+        patch(
+            "ui.auth.password_reset.send_invite_email", new_callable=AsyncMock
+        ) as mock_send,
+    ):
+        mock_user.raw_search_sync.return_value = []
+        from ui.auth.password_reset import request_password_reset
+
+        result = await request_password_reset("nobody@example.com", "https://x")
+    assert result is None
+    mock_gen.assert_not_called()
+    mock_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reset_eligible_user_issues_token_and_sends():
+    with (
+        patch("ui.auth.password_reset.User") as mock_user,
+        patch("ui.auth.password_reset.generate_token") as mock_gen,
+        patch(
+            "ui.auth.password_reset.send_invite_email", new_callable=AsyncMock
+        ) as mock_send,
+    ):
+        mock_user.raw_search_sync.return_value = [_user()]
+        mock_gen.return_value = "raw-token-xyz"
+        from ui.auth.password_reset import request_password_reset
+
+        await request_password_reset("Davide.Corio@Dubhe.it", "https://x")
+    mock_gen.assert_called_once_with(42, purpose="reset")
+    args, kwargs = mock_send.call_args
+    assert "raw-token-xyz" in args[1]
+    assert kwargs["ttl_hours"] == 1
+
+
+@pytest.mark.asyncio
+async def test_reset_bot_only_user_skipped():
+    with (
+        patch("ui.auth.password_reset.User") as mock_user,
+        patch("ui.auth.password_reset.generate_token") as mock_gen,
+        patch(
+            "ui.auth.password_reset.send_invite_email", new_callable=AsyncMock
+        ) as mock_send,
+    ):
+        mock_user.raw_search_sync.return_value = [_user(password_hash=None)]
+        from ui.auth.password_reset import request_password_reset
+
+        await request_password_reset("davide.corio@dubhe.it", "https://x")
+    mock_gen.assert_not_called()
+    mock_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reset_inactive_user_skipped():
+    with (
+        patch("ui.auth.password_reset.User") as mock_user,
+        patch("ui.auth.password_reset.generate_token") as mock_gen,
+        patch(
+            "ui.auth.password_reset.send_invite_email", new_callable=AsyncMock
+        ) as mock_send,
+    ):
+        mock_user.raw_search_sync.return_value = [_user(is_active=False)]
+        from ui.auth.password_reset import request_password_reset
+
+        await request_password_reset("davide.corio@dubhe.it", "https://x")
+    mock_gen.assert_not_called()
+    mock_send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reset_send_failure_swallowed():
+    with (
+        patch("ui.auth.password_reset.User") as mock_user,
+        patch("ui.auth.password_reset.generate_token") as mock_gen,
+        patch(
+            "ui.auth.password_reset.send_invite_email", new_callable=AsyncMock
+        ) as mock_send,
+    ):
+        mock_user.raw_search_sync.return_value = [_user()]
+        mock_gen.return_value = "t"
+        mock_send.side_effect = RuntimeError("mcp down")
+        from ui.auth.password_reset import request_password_reset
+
+        result = await request_password_reset("davide.corio@dubhe.it", "https://x")
+    assert result is None
