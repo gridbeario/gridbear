@@ -11,7 +11,9 @@ from datetime import datetime, timedelta
 import bcrypt
 
 from core.config_models import PasswordToken
+from core.mcp_gateway.server import get_client_manager
 from core.models.user import User
+from core.system_config import SystemConfig
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +125,22 @@ def get_agent_email_config(agent_id: str) -> dict | None:
         return None
 
 
-async def send_invite_email(user: dict, token_url: str) -> bool:
+async def send_invite_email(
+    user: dict,
+    token_url: str,
+    subject: str | None = None,
+    ttl_hours: int | None = None,
+) -> bool:
     """Try to send an invite email via the system agent's Gmail MCP tool.
 
     Reads the system_agent setting, looks up its email config (account,
     sender_name, signature), and calls the correct namespaced Gmail tool.
+
+    Args:
+        user: User dict with email, display_name, username.
+        token_url: Setup/reset link to embed in the email body.
+        subject: Email subject override (defaults to the invite subject).
+        ttl_hours: Expiry TTL shown in the body (defaults to INVITE_TTL_HOURS).
 
     Returns True if email was sent, False if delivery failed or unavailable.
     """
@@ -139,10 +152,13 @@ async def send_invite_email(user: dict, token_url: str) -> bool:
         )
         return False
 
+    if subject is None:
+        subject = "GridBear — Set up your password"
+    if ttl_hours is None:
+        ttl_hours = INVITE_TTL_HOURS
+
     try:
         from core.mcp_gateway.client_manager import _sanitize_name
-        from core.mcp_gateway.server import get_client_manager
-        from core.system_config import SystemConfig
 
         client_manager = get_client_manager()
         if not client_manager:
@@ -172,13 +188,13 @@ async def send_invite_email(user: dict, token_url: str) -> bool:
         tool_name = f"{sanitized}__send_email"
 
         display_name = user.get("display_name") or user.get("username", "")
-        subject = "GridBear — Set up your password"
+        hours_label = "1 hour" if ttl_hours == 1 else f"{ttl_hours} hours"
         body = (
             f"Hi {display_name},\n\n"
             f"You've been invited to set up your GridBear portal password.\n\n"
             f"Click the link below to create your password:\n"
             f"{token_url}\n\n"
-            f"This link expires in {INVITE_TTL_HOURS} hours.\n\n"
+            f"This link expires in {hours_label}.\n\n"
             f"If you didn't expect this email, you can safely ignore it."
         )
         if signature:
