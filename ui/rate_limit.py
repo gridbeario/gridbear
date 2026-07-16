@@ -25,6 +25,7 @@ RATE_LIMITS = {
     "login": RateLimitConfig(requests=5, window=60),  # 5 attempts per minute
     "api": RateLimitConfig(requests=100, window=60),  # 100 requests per minute
     "default": RateLimitConfig(requests=60, window=60),  # 60 requests per minute
+    "password_reset": RateLimitConfig(requests=3, window=300),  # 3 per 5 min
 }
 
 
@@ -85,6 +86,14 @@ class RateLimiter:
         self._requests[key].append(now)
         return True, 0
 
+    def is_allowed_key(self, key: str, category: str = "default") -> tuple[bool, int]:
+        """Check if a request is allowed for an arbitrary key (e.g. an account).
+
+        Alias for `is_allowed` kept separate for call-site clarity (accounts
+        vs. IPs); the sliding-window logic is identical.
+        """
+        return self.is_allowed(key, category)
+
     def get_remaining(self, ip: str, category: str = "default") -> int:
         """Get remaining requests in current window."""
         config = RATE_LIMITS.get(category, RATE_LIMITS["default"])
@@ -127,6 +136,21 @@ async def check_rate_limit(request: Request, category: str = "default"):
     """
     ip = get_client_ip(request)
     allowed, retry_after = rate_limiter.is_allowed(ip, category)
+
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many requests. Please try again in {retry_after} seconds.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+async def check_rate_limit_key(key: str, category: str = "default"):
+    """Check rate limit for an arbitrary key (e.g. an account).
+
+    Raises HTTPException 429 if rate limited.
+    """
+    allowed, retry_after = rate_limiter.is_allowed_key(key, category)
 
     if not allowed:
         raise HTTPException(
