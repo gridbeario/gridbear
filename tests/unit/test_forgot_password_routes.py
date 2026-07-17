@@ -1,3 +1,17 @@
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    # rate_limiter is a module-level singleton; clear it so per-IP/per-account
+    # counts don't accumulate across tests in the same process.
+    from ui.rate_limit import rate_limiter
+
+    rate_limiter._requests.clear()
+    yield
+    rate_limiter._requests.clear()
+
+
 def test_password_reset_category_exists():
     from ui.rate_limit import RATE_LIMITS
 
@@ -54,6 +68,31 @@ def test_post_known_and_unknown_email_identical_response():
         )
     assert r_known.status_code == r_unknown.status_code == 200
     assert r_known.text == r_unknown.text
+
+
+def test_post_uses_configured_base_url(monkeypatch):
+    from unittest.mock import patch
+
+    monkeypatch.setenv("GRIDBEAR_BASE_URL", "https://gridbear.example.com")
+    client = _client()
+    with patch("ui.routes.auth.request_password_reset") as mock_req:
+        mock_req.return_value = None
+        client.post("/auth/forgot-password", data={"email": "x@example.com"})
+    # The BackgroundTask runs during response teardown under TestClient.
+    args, _ = mock_req.call_args
+    assert args[1] == "https://gridbear.example.com"
+
+
+def test_post_falls_back_to_request_base_url(monkeypatch):
+    from unittest.mock import patch
+
+    monkeypatch.delenv("GRIDBEAR_BASE_URL", raising=False)
+    client = _client()
+    with patch("ui.routes.auth.request_password_reset") as mock_req:
+        mock_req.return_value = None
+        client.post("/auth/forgot-password", data={"email": "x@example.com"})
+    args, _ = mock_req.call_args
+    assert args[1].startswith("http://testserver")
 
 
 def test_setup_password_page_reflects_min_length():

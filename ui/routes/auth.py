@@ -1224,7 +1224,9 @@ async def forgot_password(request: Request, email: str = Form(...)):
     await check_rate_limit(request, "password_reset")
     await check_rate_limit_key(f"acct:{email.strip().lower()}", "password_reset")
 
-    base_url = str(request.base_url)
+    # Prefer the configured public URL so the emailed link points at the real
+    # host, not whatever host this request arrived on (proxy/curl/localhost).
+    base_url = os.environ.get("GRIDBEAR_BASE_URL") or str(request.base_url)
     return templates.TemplateResponse(
         "auth/forgot_password.html",
         {"request": request, "submitted": True},
