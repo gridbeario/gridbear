@@ -134,7 +134,30 @@ jobs:
         # No fix release as of 2026-04-25; only triggered by malicious package
         # archives during install — we pin our own deps and don't install
         # arbitrary user input, so the path isn't reachable in our runtime.
-        run: pip-audit --desc --skip-editable --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219  # pygments regex DoS + pip tar/zip confusion
+        #
+        # Starlette PYSEC-2026-161/248/249/2280/2281: all fixed in Starlette
+        # 1.x, but the codebase is pinned to starlette<0.51.0 because fastapi's
+        # TemplateResponse call sites use the pre-1.0 signature (see issue for
+        # the tracked 1.x migration). Reachability audited — none apply to the
+        # running app:
+        #   - 161 (Host header -> request.url.path auth bypass): the only
+        #     request.url.path security check lives in OAuth2BearerMiddleware,
+        #     which is not mounted; no active middleware/route reads request.url
+        #     for authorization.
+        #   - 248 (path -> request.url.hostname): no request.url.hostname/netloc
+        #     usage anywhere in the codebase.
+        #   - 249 (form limits ignored for urlencoded): we never set
+        #     max_fields/max_part_size, so no configured limit is bypassed;
+        #     generic large-body DoS is bounded by the fronting proxy.
+        #   - 2280 (HTTPEndpoint method confusion): no Starlette HTTPEndpoint
+        #     subclasses — routes are FastAPI APIRouter handlers.
+        #   - 2281 (StaticFiles SSRF on Windows): Linux-only deployment.
+        run: >-
+          pip-audit --desc --skip-editable
+          --ignore-vuln CVE-2026-4539 --ignore-vuln CVE-2026-3219
+          --ignore-vuln PYSEC-2026-161 --ignore-vuln GHSA-86qp-5c8j-p5mr
+          --ignore-vuln PYSEC-2026-248 --ignore-vuln PYSEC-2026-249
+          --ignore-vuln PYSEC-2026-2280 --ignore-vuln PYSEC-2026-2281
 
       - name: Secret scan
         run: |
