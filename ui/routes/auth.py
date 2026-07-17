@@ -17,15 +17,17 @@ from pathlib import Path
 import bcrypt
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from starlette.background import BackgroundTask
 
 from core.api_schemas import ApiResponse, api_ok
 from ui.auth.database import auth_db
+from ui.auth.password_reset import request_password_reset
 from ui.auth.recovery import recovery_manager
 from ui.auth.session import get_current_user, get_session_token, session_manager
 from ui.auth.totp import totp_manager
 from ui.auth.webauthn import webauthn_manager
 from ui.config_manager import ConfigManager
-from ui.rate_limit import check_rate_limit
+from ui.rate_limit import check_rate_limit, check_rate_limit_key
 
 router = APIRouter()
 
@@ -1197,6 +1199,37 @@ async def revoke_all_sessions(request: Request, user: dict = Depends(require_use
     )
 
     return RedirectResponse(url="/auth/security", status_code=303)
+
+
+# --- Password reset (forgot password) ---
+
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    """Display the password-reset request form."""
+    return templates.TemplateResponse(
+        "auth/forgot_password.html",
+        {"request": request, "submitted": False},
+    )
+
+
+@router.post("/forgot-password", response_class=HTMLResponse)
+async def forgot_password(request: Request, email: str = Form(...)):
+    """Accept a reset request; always respond generically.
+
+    Rate-limited per IP and per account. All lookup/token/email work runs in a
+    BackgroundTask AFTER the response is sent, so response time does not depend
+    on whether the address matched an account.
+    """
+    await check_rate_limit(request, "password_reset")
+    await check_rate_limit_key(f"acct:{email.strip().lower()}", "password_reset")
+
+    base_url = str(request.base_url)
+    return templates.TemplateResponse(
+        "auth/forgot_password.html",
+        {"request": request, "submitted": True},
+        background=BackgroundTask(request_password_reset, email, base_url),
+    )
 
 
 # --- Password setup (invite / reset token) ---
