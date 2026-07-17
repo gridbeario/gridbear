@@ -54,3 +54,13 @@ def test_post_known_and_unknown_email_identical_response():
         )
     assert r_known.status_code == r_unknown.status_code == 200
     assert r_known.text == r_unknown.text
+
+
+def test_setup_password_page_reflects_min_length():
+    client = _client()
+    resp = client.get(
+        "/auth/setup-password"
+    )  # no token → renders form with an error banner
+    assert resp.status_code == 200
+    assert 'minlength="12"' in resp.text
+    assert 'minlength="8"' not in resp.text

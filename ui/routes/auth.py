@@ -1244,14 +1244,24 @@ async def setup_password_page(request: Request):
     if not raw_token:
         return templates.TemplateResponse(
             "auth/setup_password.html",
-            {"request": request, "error": "Missing token.", "token": ""},
+            {
+                "request": request,
+                "error": "Missing token.",
+                "token": "",
+                "min_password_length": MIN_PASSWORD_LENGTH,
+            },
         )
 
     token_data = validate_token(raw_token)
     if not token_data:
         return templates.TemplateResponse(
             "auth/setup_password.html",
-            {"request": request, "error": "Invalid or expired link.", "token": ""},
+            {
+                "request": request,
+                "error": "Invalid or expired link.",
+                "token": "",
+                "min_password_length": MIN_PASSWORD_LENGTH,
+            },
         )
 
     return templates.TemplateResponse(
@@ -1263,6 +1273,7 @@ async def setup_password_page(request: Request):
             "display_name": token_data.get("display_name"),
             "error": None,
             "success": None,
+            "min_password_length": MIN_PASSWORD_LENGTH,
         },
     )
 
@@ -1281,7 +1292,12 @@ async def setup_password(
     if not token_data:
         return templates.TemplateResponse(
             "auth/setup_password.html",
-            {"request": request, "error": "Invalid or expired link.", "token": ""},
+            {
+                "request": request,
+                "error": "Invalid or expired link.",
+                "token": "",
+                "min_password_length": MIN_PASSWORD_LENGTH,
+            },
         )
 
     if password != password_confirm:
@@ -1294,6 +1310,7 @@ async def setup_password(
                 "username": token_data["unified_id"],
                 "display_name": token_data.get("display_name"),
                 "success": None,
+                "min_password_length": MIN_PASSWORD_LENGTH,
             },
         )
 
@@ -1307,6 +1324,7 @@ async def setup_password(
                 "username": token_data["unified_id"],
                 "display_name": token_data.get("display_name"),
                 "success": None,
+                "min_password_length": MIN_PASSWORD_LENGTH,
             },
         )
 
@@ -1320,5 +1338,6 @@ async def setup_password(
             "success": "Password set successfully! You can now log in.",
             "error": None,
             "token": "",
+            "min_password_length": MIN_PASSWORD_LENGTH,
         },
     )
