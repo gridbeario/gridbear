@@ -17,6 +17,9 @@ class User(Model):
 
     username = fields.Text(unique=True)
     email = fields.Text()
+    # Uniqueness enforced by partial index idx_users_email_lower
+    # (migration 013 in ui/auth/database.py), not the ORM
+
     password_hash = fields.Text()  # nullable = bot-only user
     display_name = fields.Text()
     avatar_url = fields.Text()

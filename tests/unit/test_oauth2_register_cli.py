@@ -8,14 +8,20 @@ Verifies:
 5. Backward compatibility: redirect_uris flow still works
 """
 
+import importlib
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Stub optional dependencies that may not be installed on the host
+# Stub optional dependencies only when genuinely absent. Checking `not in
+# sys.modules` is not enough: an installed-but-not-yet-imported package would be
+# stubbed with a MagicMock that then leaks into later tests (e.g. `from
+# webauthn.helpers import ...` failing with "'webauthn' is not a package").
 for _mod in ("pyotp", "qrcode", "webauthn"):
-    if _mod not in sys.modules:
+    try:
+        importlib.import_module(_mod)
+    except ImportError:
         sys.modules[_mod] = MagicMock()
 
 from core.oauth2.server import register_client

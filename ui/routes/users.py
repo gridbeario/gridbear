@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import psycopg
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
@@ -156,13 +157,18 @@ async def create_portal_user(
     if existing:
         return RedirectResponse(url="/users?error=username_exists", status_code=303)
 
-    auth_db.create_user(
-        username=username,
-        password_hash=hash_password(password),
-        display_name=display_name.strip() or None,
-        is_superadmin=is_superadmin == "1",
-        email=email.strip() or None,
-    )
+    try:
+        auth_db.create_user(
+            username=username,
+            password_hash=hash_password(password),
+            display_name=display_name.strip() or None,
+            is_superadmin=is_superadmin == "1",
+            email=email.strip() or None,
+        )
+    except psycopg.errors.UniqueViolation as exc:
+        if getattr(exc.diag, "constraint_name", None) == "idx_users_email_lower":
+            return RedirectResponse(url="/users?error=email_exists", status_code=303)
+        return RedirectResponse(url="/users?error=username_exists", status_code=303)
 
     return RedirectResponse(url="/users", status_code=303)
 
@@ -178,13 +184,16 @@ async def update_portal_user(
     _: bool = Depends(require_login),
 ):
     """Update a user."""
-    auth_db.update_user(
-        user_id,
-        display_name=display_name.strip() or None,
-        is_superadmin=is_superadmin == "1",
-        is_active=is_active == "1",
-        email=email.strip() or None,
-    )
+    try:
+        auth_db.update_user(
+            user_id,
+            display_name=display_name.strip() or None,
+            is_superadmin=is_superadmin == "1",
+            is_active=is_active == "1",
+            email=email.strip() or None,
+        )
+    except psycopg.errors.UniqueViolation:
+        return RedirectResponse(url="/users?error=email_exists", status_code=303)
     return RedirectResponse(url="/users", status_code=303)
 
 

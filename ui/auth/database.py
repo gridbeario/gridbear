@@ -80,26 +80,39 @@ CREATE INDEX IF NOT EXISTS idx_tool_prefs_uid ON admin.user_tool_preferences(uni
 
 
 def _init_pg(db) -> None:
-    """Run the PostgreSQL migration if not already applied."""
+    """Run PostgreSQL migrations if not already applied."""
     with db.acquire_sync() as conn:
-        # Check if migration already applied
+        # Migration 001: admin auth schema
         row = conn.execute(
             "SELECT 1 FROM public._migrations WHERE name = %s",
             ("001_admin_auth",),
         ).fetchone()
-        if row:
-            return
+        if not row:
+            conn.execute(PG_SCHEMA)
+            conn.execute(
+                "INSERT INTO public._migrations (name) VALUES (%s)",
+                ("001_admin_auth",),
+            )
+            conn.commit()
+            logger.info("Applied migration: 001_admin_auth")
 
-        # Execute embedded DDL
-        conn.execute(PG_SCHEMA)
-
-        # Register migration
-        conn.execute(
-            "INSERT INTO public._migrations (name) VALUES (%s)",
-            ("001_admin_auth",),
-        )
-        conn.commit()
-        logger.info("Applied migration: 001_admin_auth")
+        # Migration 013: partial unique index on lower(email)
+        row = conn.execute(
+            "SELECT 1 FROM public._migrations WHERE name = %s",
+            ("013_users_email_unique",),
+        ).fetchone()
+        if not row:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower "
+                "ON app.users (lower(email)) "
+                "WHERE email IS NOT NULL AND email <> ''"
+            )
+            conn.execute(
+                "INSERT INTO public._migrations (name) VALUES (%s)",
+                ("013_users_email_unique",),
+            )
+            conn.commit()
+            logger.info("Applied migration: 013_users_email_unique")
 
 
 def init_auth_db() -> None:
