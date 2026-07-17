@@ -137,9 +137,9 @@ jobs:
         #
         # Starlette PYSEC-2026-161/248/249/2280/2281: all fixed in Starlette
         # 1.x, but the codebase is pinned to starlette<0.51.0 because fastapi's
-        # TemplateResponse call sites use the pre-1.0 signature (see issue for
-        # the tracked 1.x migration). Reachability audited — none apply to the
-        # running app:
+        # TemplateResponse call sites use the pre-1.0 signature (tracked for
+        # the 1.x migration in issue #181). Reachability audited — none apply
+        # to the running app:
         #   - 161 (Host header -> request.url.path auth bypass): the only
         #     request.url.path security check lives in OAuth2BearerMiddleware,
         #     which is not mounted; no active middleware/route reads request.url
