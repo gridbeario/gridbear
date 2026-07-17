@@ -47,7 +47,7 @@ def generate_token(user_id: int, purpose: str, ttl_hours: int | None = None) -> 
 
     # Invalidate any existing unused tokens for same user+purpose
     existing = PasswordToken.search_sync(
-        [("user_id", "=", user_id), ("purpose", "=", purpose), ("used_at", "=", None)]
+        [("user_id", "=", user_id), ("purpose", "=", purpose), ("used_at", "is", None)]
     )
     for old in existing:
         PasswordToken.write_sync(old["id"], used_at=datetime.now())
