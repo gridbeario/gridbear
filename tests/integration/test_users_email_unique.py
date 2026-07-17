@@ -70,3 +70,26 @@ def test_migration_creates_partial_unique_index_and_is_idempotent(pg_db):
             "AND indexname='idx_users_email_lower'"
         ).fetchone()
     assert row is not None
+
+
+def test_create_user_duplicate_email_rejected(pg_db):
+    """Two users sharing an email (case-insensitive) must be rejected at DB level."""
+    import psycopg
+
+    with pg_db.acquire_sync() as conn:
+        conn.execute(
+            "INSERT INTO app.users (username, email, is_active) "
+            "VALUES ('dup_a', 'dup@example.com', true) "
+            "ON CONFLICT (username) DO NOTHING"
+        )
+        conn.commit()
+    with pg_db.acquire_sync() as conn:
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            conn.execute(
+                "INSERT INTO app.users (username, email, is_active) "
+                "VALUES ('dup_b', 'DUP@example.com', true)"
+            )
+            conn.commit()
+    with pg_db.acquire_sync() as conn:
+        conn.execute("DELETE FROM app.users WHERE username IN ('dup_a','dup_b')")
+        conn.commit()
