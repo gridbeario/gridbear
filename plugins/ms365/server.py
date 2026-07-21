@@ -664,14 +664,11 @@ class MS365Server:
             if isinstance(content, bytes):
                 try:
                     text = content.decode("utf-8")
-                    if len(text) > 10000:
-                        text = text[:10000] + "\n...(truncated)"
-                    return {"success": True, "content": text, "file_path": file_path}
+                    if len(text) > 50_000:
+                        text = text[:50_000] + "\n...(truncated)"
                 except UnicodeDecodeError:
-                    return {
-                        "success": False,
-                        "error": "Binary file cannot be displayed as text",
-                    }
+                    text = extract_text(content, file_path, max_chars=50_000)
+                return {"success": True, "content": text, "file_path": file_path}
             return {"success": False, "error": "Could not read file"}
 
         elif name == "m365_read_shared":
@@ -1082,11 +1079,11 @@ class MS365Server:
             if isinstance(content, bytes):
                 try:
                     text = content.decode("utf-8")
-                    if len(text) > 10000:
-                        text = text[:10000] + "\n...(truncated)"
-                    return {"success": True, "content": text, "file_path": file_path}
+                    if len(text) > 50_000:
+                        text = text[:50_000] + "\n...(truncated)"
                 except UnicodeDecodeError:
-                    return {"success": False, "error": "Binary file"}
+                    text = extract_text(content, file_path, max_chars=50_000)
+                return {"success": True, "content": text, "file_path": file_path}
             return {"success": False, "error": "Could not read file"}
 
         elif name == "m365_write_drive_file":

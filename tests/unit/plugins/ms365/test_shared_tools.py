@@ -1,3 +1,4 @@
+import io
 from unittest.mock import AsyncMock
 
 import pytest
@@ -276,3 +277,52 @@ async def test_list_shared_null_fields_robust():
         and row["shared_by"] is None
         and row["is_folder"] is False
     )
+
+
+def _docx_bytes_local(text):
+    from docx import Document
+
+    d = Document()
+    d.add_paragraph(text)
+    b = io.BytesIO()
+    d.save(b)
+    return b.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_read_file_extracts_docx():
+    s = _server()
+    s._graph_request = AsyncMock(
+        side_effect=[
+            {"value": [{"id": "drv1"}]},  # drives lookup
+            _docx_bytes_local("Report body"),  # /content bytes
+        ]
+    )
+    res = await s._call_tool_impl(
+        "m365_read_file", {"site_id": "S", "file_path": "/r.docx"}
+    )
+    assert res["success"] is True and "Report body" in res["content"]
+
+
+@pytest.mark.asyncio
+async def test_read_drive_file_extracts_docx():
+    s = _server()
+    s._graph_request = AsyncMock(return_value=_docx_bytes_local("Drive doc"))
+    res = await s._call_tool_impl("m365_read_drive_file", {"file_path": "/d.docx"})
+    assert res["success"] is True and "Drive doc" in res["content"]
+
+
+@pytest.mark.asyncio
+async def test_read_file_plain_text_preserved():
+    # A non-Office utf-8 file (e.g. .py) must return its content (old behavior).
+    s = _server()
+    s._graph_request = AsyncMock(
+        side_effect=[
+            {"value": [{"id": "drv1"}]},
+            b"print('hello')",
+        ]
+    )
+    res = await s._call_tool_impl(
+        "m365_read_file", {"site_id": "S", "file_path": "/app.py"}
+    )
+    assert res["success"] is True and "print('hello')" in res["content"]
