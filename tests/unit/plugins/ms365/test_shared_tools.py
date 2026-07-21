@@ -120,3 +120,73 @@ async def test_read_item_fallback_error_status(monkeypatch):
         await s._read_item(
             {"name": "f.pdf", "id": "I1", "parentReference": {"driveId": "D1"}}
         )
+
+
+@pytest.mark.asyncio
+async def test_read_shared_by_link(monkeypatch):
+    s = _server()
+    s._graph_request = AsyncMock(
+        return_value={
+            "name": "plan.docx",
+            "@microsoft.graph.downloadUrl": "https://dl/p",
+        }
+    )
+    monkeypatch.setattr(s, "_download_stream", AsyncMock(return_value=b"raw"))
+    monkeypatch.setattr(srv, "extract_text", lambda b, n, **k: f"TEXT:{n}")
+    res = await s._call_tool_impl(
+        "m365_read_shared", {"sharing_url": "https://share/x"}
+    )
+    assert res["success"] is True and res["content"] == "TEXT:plan.docx"
+    endpoint = s._graph_request.call_args[0][1]
+    assert endpoint.startswith("/shares/u!") and "u!u!" not in endpoint
+
+
+@pytest.mark.asyncio
+async def test_read_shared_by_drive_item(monkeypatch):
+    s = _server()
+    s._graph_request = AsyncMock(
+        return_value={"name": "s.xlsx", "@microsoft.graph.downloadUrl": "https://dl/s"}
+    )
+    monkeypatch.setattr(s, "_download_stream", AsyncMock(return_value=b"raw"))
+    monkeypatch.setattr(srv, "extract_text", lambda b, n, **k: "OK")
+    res = await s._call_tool_impl(
+        "m365_read_shared", {"drive_id": "D1", "item_id": "I1"}
+    )
+    assert res["success"] is True
+    assert s._graph_request.call_args[0][1] == "/drives/D1/items/I1"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "args,msg",
+    [
+        ({}, "provide either"),
+        ({"drive_id": "D1"}, "supplied together"),
+        ({"item_id": "I1"}, "supplied together"),
+        ({"sharing_url": "u", "drive_id": "D1", "item_id": "I1"}, "only one"),
+    ],
+)
+async def test_read_shared_input_contract(args, msg):
+    s = _server()
+    s._graph_request = AsyncMock()
+    res = await s._call_tool_impl("m365_read_shared", args)
+    assert res["success"] is False and msg in res["error"]
+    s._graph_request.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_read_shared_folder_guard():
+    s = _server()
+    s._graph_request = AsyncMock(
+        return_value={"name": "Dir", "folder": {"childCount": 2}}
+    )
+    res = await s._call_tool_impl("m365_read_shared", {"sharing_url": "https://s/d"})
+    assert res["success"] is False and "folder" in res["error"]
+
+
+@pytest.mark.asyncio
+async def test_read_shared_403_scope_message():
+    s = _server()
+    s._graph_request = AsyncMock(side_effect=Exception("Graph API error (403): denied"))
+    res = await s._call_tool_impl("m365_read_shared", {"sharing_url": "https://s/d"})
+    assert res["success"] is False and "Files.Read.All" in res["error"]

@@ -16,6 +16,8 @@ from typing import Any
 import httpx
 import msal
 
+from plugins.ms365.extract import encode_sharing_url, extract_text
+
 # MCP server imports
 try:
     from mcp.server import Server
@@ -153,6 +155,31 @@ class MS365Server:
                             },
                         },
                         "required": ["site_id", "file_path"],
+                    },
+                ),
+                Tool(
+                    name="m365_read_shared",
+                    description=(
+                        "Read a document SHARED WITH the user — by share link "
+                        "(from email) or by drive_id+item_id from m365_list_shared. "
+                        "Returns extracted text for Word/Excel/PDF."
+                    ),
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "sharing_url": {
+                                "type": "string",
+                                "description": "Share link URL (from an email/message)",
+                            },
+                            "drive_id": {
+                                "type": "string",
+                                "description": "Drive ID (from m365_list_shared)",
+                            },
+                            "item_id": {
+                                "type": "string",
+                                "description": "Item ID (from m365_list_shared)",
+                            },
+                        },
                     },
                 ),
                 Tool(
@@ -636,6 +663,63 @@ class MS365Server:
                         "error": "Binary file cannot be displayed as text",
                     }
             return {"success": False, "error": "Could not read file"}
+
+        elif name == "m365_read_shared":
+            sharing_url = args.get("sharing_url")
+            drive_id = args.get("drive_id")
+            item_id = args.get("item_id")
+            has_pair = bool(drive_id) and bool(item_id)
+            if sharing_url and (drive_id or item_id):
+                return {
+                    "success": False,
+                    "error": "provide only one of: sharing_url, or drive_id+item_id",
+                }
+            if not sharing_url and (bool(drive_id) != bool(item_id)):
+                return {
+                    "success": False,
+                    "error": "drive_id and item_id must be supplied together",
+                }
+            if not sharing_url and not has_pair:
+                return {
+                    "success": False,
+                    "error": "provide either sharing_url or both drive_id and item_id",
+                }
+            try:
+                if sharing_url:
+                    endpoint = f"/shares/{encode_sharing_url(sharing_url)}/driveItem"
+                else:
+                    endpoint = f"/drives/{drive_id}/items/{item_id}"
+                metadata = await self._graph_request("GET", endpoint)
+                if not isinstance(metadata, dict):
+                    return {"success": False, "error": "could not resolve shared item"}
+                content, fname = await self._read_item(metadata)
+                text = extract_text(content, fname, max_chars=50_000)
+                return {"success": True, "content": text, "name": fname}
+            except SharedReadError as err:
+                return {"success": False, "error": str(err)}
+            # NOTE: status-code detection below depends on _graph_request's
+            # exception message format: "Graph API error ({status}): {msg}".
+            # If that format changes, update these substring checks.
+            except Exception as err:
+                msg = str(err)
+                if "(403)" in msg:
+                    return {
+                        "success": False,
+                        "error": (
+                            "access denied — the token likely lacks "
+                            "Files.Read.All; re-authenticate this account "
+                            "with the broader scope"
+                        ),
+                    }
+                if "(404)" in msg:
+                    return {
+                        "success": False,
+                        "error": (
+                            "shared item not found — link expired/revoked, "
+                            "or not shared to this account"
+                        ),
+                    }
+                return {"success": False, "error": f"read failed: {msg}"}
 
         elif name == "m365_write_file":
             site_id = args["site_id"]
