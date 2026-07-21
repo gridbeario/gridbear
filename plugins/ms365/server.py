@@ -35,6 +35,7 @@ TOKEN_DATA = os.environ.get("MS365_TOKEN_DATA", "{}")
 ROLE = os.environ.get("MS365_ROLE", "guest")
 
 GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
+MAX_INLINE_READ_BYTES = 50 * 1024 * 1024
 STATE_FILE = Path("/app/data/ms365_context.json")
 
 # Parse token data
@@ -42,6 +43,10 @@ try:
     token_info = json.loads(TOKEN_DATA)
 except json.JSONDecodeError:
     token_info = {}
+
+
+class SharedReadError(Exception):
+    """Actionable, user-facing error from a shared-item read."""
 
 
 class MS365Server:
@@ -459,6 +464,60 @@ class MS365Server:
         if "application/json" in content_type_header:
             return response.json()
         return response.content
+
+    async def _download_stream(
+        self, url: str, max_bytes: int = MAX_INLINE_READ_BYTES
+    ) -> bytes:
+        """Download a pre-authenticated URL with NO auth header, streaming with a
+        size guard. Aborts as soon as the running byte count exceeds max_bytes."""
+        buf = bytearray()
+        async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
+            async with client.stream("GET", url) as resp:
+                if resp.status_code >= 400:
+                    raise SharedReadError(f"download failed (HTTP {resp.status_code})")
+                clen = resp.headers.get("content-length")
+                if clen and clen.isdigit() and int(clen) > max_bytes:
+                    raise SharedReadError(
+                        f"file too large (>{max_bytes // (1024 * 1024)} MB) "
+                        "to read inline"
+                    )
+                async for chunk in resp.aiter_bytes():
+                    buf.extend(chunk)
+                    if len(buf) > max_bytes:
+                        raise SharedReadError(
+                            f"file too large (>{max_bytes // (1024 * 1024)} MB) "
+                            "to read inline"
+                        )
+        return bytes(buf)
+
+    async def _read_item(self, metadata: dict) -> tuple[bytes, str]:
+        """From a resolved driveItem's metadata, return (content_bytes, filename).
+        Guards folders; downloads via the pre-authenticated downloadUrl."""
+        if metadata.get("folder") is not None:
+            raise SharedReadError("shared item is a folder, not a readable document")
+        name = metadata.get("name", "file")
+        download_url = metadata.get("@microsoft.graph.downloadUrl")
+        if download_url:
+            return await self._download_stream(download_url), name
+        # Fallback (rare): a file with no downloadUrl. Fetch /content without
+        # following the redirect, read the 302 Location, download it unauthenticated.
+        drive_id = (metadata.get("parentReference") or {}).get("driveId")
+        item_id = metadata.get("id")
+        if drive_id and item_id:
+            token = await self._get_valid_token()
+            async with httpx.AsyncClient(
+                base_url=GRAPH_API_BASE, follow_redirects=False, timeout=30.0
+            ) as client:
+                resp = await client.get(
+                    f"/drives/{drive_id}/items/{item_id}/content",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+            if resp.status_code >= 400:
+                raise SharedReadError(f"cannot read item (HTTP {resp.status_code})")
+            loc = resp.headers.get("location")
+            if loc:
+                return await self._download_stream(loc), name
+        raise SharedReadError("cannot read this item (no download URL available)")
 
     async def _call_tool_impl(self, name: str, args: dict) -> dict:
         """Execute tool and return result."""
