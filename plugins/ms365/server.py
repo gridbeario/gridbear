@@ -53,6 +53,23 @@ class SharedReadError(Exception):
     """Actionable, user-facing error from a shared-item read."""
 
 
+def _graph_error_message(err: Exception, action: str) -> str:
+    """Map a _graph_request exception to an actionable message.
+
+    NOTE: depends on _graph_request's message format
+    "Graph API error ({status}): {msg}". If that format changes, update this.
+    """
+    msg = str(err)
+    if "(403)" in msg:
+        return (
+            "access denied — the token likely lacks Files.Read.All; "
+            "re-authenticate this account with the broader scope"
+        )
+    if "(404)" in msg:
+        return "not found — link expired/revoked, or not shared to this account"
+    return f"{action} failed: {msg}"
+
+
 class MS365Server:
     """MCP server for Microsoft 365 operations."""
 
@@ -704,29 +721,8 @@ class MS365Server:
                 return {"success": True, "content": text, "name": fname}
             except SharedReadError as err:
                 return {"success": False, "error": str(err)}
-            # NOTE: status-code detection below depends on _graph_request's
-            # exception message format: "Graph API error ({status}): {msg}".
-            # If that format changes, update these substring checks.
             except Exception as err:
-                msg = str(err)
-                if "(403)" in msg:
-                    return {
-                        "success": False,
-                        "error": (
-                            "access denied — the token likely lacks "
-                            "Files.Read.All; re-authenticate this account "
-                            "with the broader scope"
-                        ),
-                    }
-                if "(404)" in msg:
-                    return {
-                        "success": False,
-                        "error": (
-                            "shared item not found — link expired/revoked, "
-                            "or not shared to this account"
-                        ),
-                    }
-                return {"success": False, "error": f"read failed: {msg}"}
+                return {"success": False, "error": _graph_error_message(err, "read")}
 
         elif name == "m365_list_shared":
             items = []
@@ -769,21 +765,8 @@ class MS365Server:
                     "items": items,
                     "truncated": truncated,
                 }
-            # NOTE: status-code detection below depends on _graph_request's
-            # exception message format: "Graph API error ({status}): {msg}".
-            # If that format changes, update these substring checks.
             except Exception as err:
-                msg = str(err)
-                if "(403)" in msg:
-                    return {
-                        "success": False,
-                        "error": (
-                            "access denied — the token likely lacks "
-                            "Files.Read.All; re-authenticate this account "
-                            "with the broader scope"
-                        ),
-                    }
-                return {"success": False, "error": f"list failed: {msg}"}
+                return {"success": False, "error": _graph_error_message(err, "list")}
 
         elif name == "m365_write_file":
             site_id = args["site_id"]

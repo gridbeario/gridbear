@@ -336,3 +336,24 @@ def test_new_tools_in_provider_allowlist():
     allowed = provider.get_allowed_tools()
     assert "mcp__ms365-test__m365_list_shared" in allowed
     assert "mcp__ms365-test__m365_read_shared" in allowed
+
+
+def test_graph_error_message_helper():
+    assert "Files.Read.All" in srv._graph_error_message(
+        Exception("Graph API error (403): x"), "read"
+    )
+    assert "not found" in srv._graph_error_message(
+        Exception("Graph API error (404): x"), "read"
+    )
+    assert (
+        srv._graph_error_message(Exception("Graph API error (500): boom"), "list")
+        == "list failed: Graph API error (500): boom"
+    )
+
+
+@pytest.mark.asyncio
+async def test_read_shared_404_message():
+    s = _server()
+    s._graph_request = AsyncMock(side_effect=Exception("Graph API error (404): gone"))
+    res = await s._call_tool_impl("m365_read_shared", {"sharing_url": "https://s/d"})
+    assert res["success"] is False and "not found" in res["error"]
