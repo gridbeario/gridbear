@@ -51,6 +51,9 @@ google = [
 ]
 ms365 = [
     "msal>=1.36.0",
+    "openpyxl>=3.1.0",
+    "pypdf>=4.0.0",
+    "python-docx>=1.2.0",
 ]
 livekit = [
     "livekit>=1.0.0",

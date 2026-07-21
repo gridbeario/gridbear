@@ -326,3 +326,13 @@ async def test_read_file_plain_text_preserved():
         "m365_read_file", {"site_id": "S", "file_path": "/app.py"}
     )
     assert res["success"] is True and "print('hello')" in res["content"]
+
+
+def test_new_tools_in_provider_allowlist():
+    from plugins.ms365.provider import MS365Provider
+
+    provider = MS365Provider({"client_id": "x"})
+    provider._server_names = ["ms365-test"]
+    allowed = provider.get_allowed_tools()
+    assert "mcp__ms365-test__m365_list_shared" in allowed
+    assert "mcp__ms365-test__m365_read_shared" in allowed
