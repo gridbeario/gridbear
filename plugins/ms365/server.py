@@ -38,6 +38,8 @@ ROLE = os.environ.get("MS365_ROLE", "guest")
 
 GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
 MAX_INLINE_READ_BYTES = 50 * 1024 * 1024
+_SHARED_MAX_ITEMS = 200
+_SHARED_MAX_PAGES = 5
 STATE_FILE = Path("/app/data/ms365_context.json")
 
 # Parse token data
@@ -181,6 +183,14 @@ class MS365Server:
                             },
                         },
                     },
+                ),
+                Tool(
+                    name="m365_list_shared",
+                    description=(
+                        "List documents shared WITH the user (Shared with me). "
+                        "Returns items with drive_id/item_id to pass to m365_read_shared."
+                    ),
+                    inputSchema={"type": "object", "properties": {}},
                 ),
                 Tool(
                     name="m365_write_file",
@@ -720,6 +730,63 @@ class MS365Server:
                         ),
                     }
                 return {"success": False, "error": f"read failed: {msg}"}
+
+        elif name == "m365_list_shared":
+            items = []
+            truncated = False
+            endpoint = "/me/drive/sharedWithMe"
+            try:
+                for _page in range(_SHARED_MAX_PAGES):
+                    data = await self._graph_request("GET", endpoint)
+                    if not isinstance(data, dict):
+                        break
+                    for it in data.get("value", []):
+                        remote = it.get("remoteItem") or {}
+                        parent = remote.get("parentReference") or {}
+                        created = remote.get("createdBy") or it.get("createdBy") or {}
+                        shared_by = (created.get("user") or {}).get("displayName")
+                        items.append(
+                            {
+                                "name": it.get("name"),
+                                "shared_by": shared_by,
+                                "last_modified": it.get("lastModifiedDateTime"),
+                                "drive_id": parent.get("driveId"),
+                                "item_id": remote.get("id"),
+                                "web_url": it.get("webUrl"),
+                                "is_folder": remote.get("folder") is not None,
+                            }
+                        )
+                        if len(items) >= _SHARED_MAX_ITEMS:
+                            truncated = True
+                            break
+                    next_link = data.get("@odata.nextLink")
+                    if truncated or not next_link:
+                        break
+                    endpoint = next_link  # absolute URL — httpx uses it as-is
+                else:
+                    # loop ran the full page cap without a break → more pages exist
+                    truncated = True
+                return {
+                    "success": True,
+                    "count": len(items),
+                    "items": items,
+                    "truncated": truncated,
+                }
+            # NOTE: status-code detection below depends on _graph_request's
+            # exception message format: "Graph API error ({status}): {msg}".
+            # If that format changes, update these substring checks.
+            except Exception as err:
+                msg = str(err)
+                if "(403)" in msg:
+                    return {
+                        "success": False,
+                        "error": (
+                            "access denied — the token likely lacks "
+                            "Files.Read.All; re-authenticate this account "
+                            "with the broader scope"
+                        ),
+                    }
+                return {"success": False, "error": f"list failed: {msg}"}
 
         elif name == "m365_write_file":
             site_id = args["site_id"]

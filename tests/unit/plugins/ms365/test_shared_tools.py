@@ -190,3 +190,89 @@ async def test_read_shared_403_scope_message():
     s._graph_request = AsyncMock(side_effect=Exception("Graph API error (403): denied"))
     res = await s._call_tool_impl("m365_read_shared", {"sharing_url": "https://s/d"})
     assert res["success"] is False and "Files.Read.All" in res["error"]
+
+
+def _shared_item(name, drive, item, folder=False):
+    it = {
+        "name": name,
+        "webUrl": f"https://w/{item}",
+        "lastModifiedDateTime": "2026-07-20T10:00:00Z",
+        "remoteItem": {
+            "id": item,
+            "parentReference": {"driveId": drive},
+            "createdBy": {"user": {"displayName": "Alice"}},
+        },
+    }
+    if folder:
+        it["remoteItem"]["folder"] = {"childCount": 1}
+    return it
+
+
+@pytest.mark.asyncio
+async def test_list_shared_single_page():
+    s = _server()
+    s._graph_request = AsyncMock(
+        return_value={"value": [_shared_item("a.docx", "D", "I1")]}
+    )
+    res = await s._call_tool_impl("m365_list_shared", {})
+    assert res["success"] is True and res["count"] == 1
+    row = res["items"][0]
+    assert row["name"] == "a.docx" and row["drive_id"] == "D" and row["item_id"] == "I1"
+    assert row["is_folder"] is False and row["shared_by"] == "Alice"
+
+
+@pytest.mark.asyncio
+async def test_list_shared_follows_nextlink():
+    s = _server()
+    page1 = {
+        "value": [_shared_item("a", "D", "I1")],
+        "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/drive/sharedWithMe?$skip=1",
+    }
+    page2 = {"value": [_shared_item("b", "D", "I2")]}
+    s._graph_request = AsyncMock(side_effect=[page1, page2])
+    res = await s._call_tool_impl("m365_list_shared", {})
+    assert res["count"] == 2 and res.get("truncated") is not True
+    assert s._graph_request.call_args_list[1][0][1].startswith(
+        "https://graph.microsoft.com"
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_shared_truncates_at_cap(monkeypatch):
+    s = _server()
+    monkeypatch.setattr(srv, "_SHARED_MAX_PAGES", 2)
+    page = {
+        "value": [_shared_item("x", "D", "I")],
+        "@odata.nextLink": "https://graph.microsoft.com/v1.0/next",
+    }
+    s._graph_request = AsyncMock(return_value=page)  # always returns a nextLink
+    res = await s._call_tool_impl("m365_list_shared", {})
+    assert res["truncated"] is True
+    assert s._graph_request.call_count == 2  # stopped at the page cap
+
+
+@pytest.mark.asyncio
+async def test_list_shared_null_fields_robust():
+    s = _server()
+    s._graph_request = AsyncMock(
+        return_value={
+            "value": [
+                {
+                    "name": "x",
+                    "remoteItem": {
+                        "id": "I",
+                        "parentReference": None,
+                        "createdBy": None,
+                    },
+                }
+            ]
+        }
+    )
+    res = await s._call_tool_impl("m365_list_shared", {})
+    assert res["success"] is True and res["count"] == 1
+    row = res["items"][0]
+    assert (
+        row["drive_id"] is None
+        and row["shared_by"] is None
+        and row["is_folder"] is False
+    )
