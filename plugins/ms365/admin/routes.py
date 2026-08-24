@@ -1,6 +1,7 @@
 """Microsoft 365 plugin admin routes."""
 
 import json
+import os
 import secrets
 from datetime import datetime
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/plugins/ms365", tags=["ms365"])
 _MS365_DEFAULTS = {
     "client_id": "",
     "client_secret_env": "MS365_CLIENT_SECRET",
-    "redirect_uri": "http://localhost:8080/auth/ms365/callback",
+    "redirect_uri": "",
     "database_path": "data/ms365_tokens.db",
     "encryption_key_env": "MS365_ENCRYPTION_KEY",
     "health_check_interval": 300,
@@ -43,9 +44,23 @@ def _scopes_for_role(tenant_role: str) -> str:
     return _SCOPES_OWNER if tenant_role == "owner" else _SCOPES_GUEST
 
 
+def _default_redirect_uri() -> str:
+    """OAuth callback URL, derived from the deployment's public base URL.
+
+    Must point at the callback this router actually serves and be registered
+    verbatim in the Azure app registration: Azure compares it literally and
+    rejects the login otherwise.
+    """
+    base = os.getenv("GRIDBEAR_BASE_URL", "").rstrip("/") or "http://localhost:8088"
+    return f"{base}/plugins/ms365/callback"
+
+
 def get_ms365_config() -> dict:
     """Get MS365-specific configuration."""
-    return {**_MS365_DEFAULTS, **load_plugin_config("ms365")}
+    config = {**_MS365_DEFAULTS, **load_plugin_config("ms365")}
+    if not config.get("redirect_uri"):
+        config["redirect_uri"] = _default_redirect_uri()
+    return config
 
 
 def save_ms365_config(ms365_config: dict) -> None:
@@ -106,7 +121,7 @@ async def ms365_index(request: Request, user: dict = Depends(require_login)):
 async def save_settings(
     request: Request,
     client_id: str = Form(""),
-    redirect_uri: str = Form("http://localhost:8080/auth/ms365/callback"),
+    redirect_uri: str = Form(""),
     health_check_interval: int = Form(300),
     client_secret: str = Form(""),
     csrf_token: str = Form(...),
@@ -117,7 +132,7 @@ async def save_settings(
 
     config = get_ms365_config()
     config["client_id"] = client_id.strip()
-    config["redirect_uri"] = redirect_uri.strip()
+    config["redirect_uri"] = redirect_uri.strip() or _default_redirect_uri()
     config["health_check_interval"] = health_check_interval
     save_ms365_config(config)
 
