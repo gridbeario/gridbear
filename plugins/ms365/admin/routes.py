@@ -27,6 +27,21 @@ _MS365_DEFAULTS = {
     "tenants": [],
 }
 
+# Delegated scopes requested during the consent flow, per tenant role.
+# Files.Read.All covers files the user can access but does not own, which is what
+# the Graph Shares API needs to read documents shared by someone else; plain
+# Files.ReadWrite is limited to the user's own drive and 403s on shared items.
+_SCOPES_OWNER = (
+    "User.Read Files.ReadWrite Files.Read.All Tasks.ReadWrite "
+    "Sites.ReadWrite.All Group.Read.All offline_access"
+)
+_SCOPES_GUEST = "User.Read Files.ReadWrite.All Tasks.ReadWrite offline_access"
+
+
+def _scopes_for_role(tenant_role: str) -> str:
+    """Return the delegated scopes to request for a tenant role."""
+    return _SCOPES_OWNER if tenant_role == "owner" else _SCOPES_GUEST
+
 
 def get_ms365_config() -> dict:
     """Get MS365-specific configuration."""
@@ -266,10 +281,7 @@ async def start_oauth(
 
     state = secrets.token_urlsafe(32)
 
-    if tenant_role == "owner":
-        scopes = "User.Read Files.ReadWrite Tasks.ReadWrite Sites.ReadWrite.All Group.Read.All offline_access"
-    else:
-        scopes = "User.Read Files.ReadWrite.All Tasks.ReadWrite offline_access"
+    scopes = _scopes_for_role(tenant_role)
 
     _oauth_states[state] = {
         "tenant_name": tenant_name,
