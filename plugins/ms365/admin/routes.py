@@ -328,8 +328,10 @@ async def oauth_callback(
 ):
     """Handle OAuth callback from Microsoft."""
     if error:
+        detail = error_description or error
+        logger.error("MS365 OAuth: authorization denied by Azure: %s", detail)
         return RedirectResponse(
-            url=f"/plugins/ms365?error={error_description or error}",
+            url=f"/plugins/ms365?error={detail[:100]}",
             status_code=303,
         )
 
@@ -378,6 +380,15 @@ async def oauth_callback(
 
         if "error" in result:
             error_msg = result.get("error_description", result.get("error", "Unknown"))
+            logger.error(
+                "MS365 OAuth: token exchange failed (tenant=%s authority=%s "
+                "redirect_uri=%s scopes=%s): %s",
+                tenant_name,
+                azure_authority,
+                redirect_uri,
+                " ".join(scopes_list),
+                error_msg,
+            )
             return RedirectResponse(
                 url=f"/plugins/ms365?error={error_msg[:100]}", status_code=303
             )
@@ -408,6 +419,7 @@ async def oauth_callback(
         )
 
     except Exception as e:
+        logger.exception("MS365 OAuth: callback failed for tenant=%s", tenant_name)
         return RedirectResponse(
             url=f"/plugins/ms365?error={str(e)[:100]}",
             status_code=303,
