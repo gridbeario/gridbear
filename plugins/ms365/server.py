@@ -16,6 +16,12 @@ from typing import Any
 import httpx
 import msal
 
+# Launched as a bare script by provider.get_server_config, so the repo root is
+# not on sys.path. Add it before importing sibling plugin modules.
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
 from plugins.ms365.extract import encode_sharing_url, extract_text
 
 # MCP server imports
