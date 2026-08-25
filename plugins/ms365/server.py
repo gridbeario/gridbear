@@ -742,8 +742,17 @@ class MS365Server:
                     for it in data.get("value", []):
                         remote = it.get("remoteItem") or {}
                         parent = remote.get("parentReference") or {}
-                        created = remote.get("createdBy") or it.get("createdBy") or {}
-                        shared_by = (created.get("user") or {}).get("displayName")
+                        # Graph reports the sharer under shared.sharedBy on
+                        # sharedWithMe entries and leaves createdBy null there;
+                        # createdBy stays as a fallback for other shapes.
+                        shared = remote.get("shared") or {}
+                        sharer = (shared.get("sharedBy") or {}).get("user") or {}
+                        shared_by = sharer.get("displayName")
+                        if not shared_by:
+                            created = (
+                                remote.get("createdBy") or it.get("createdBy") or {}
+                            )
+                            shared_by = (created.get("user") or {}).get("displayName")
                         items.append(
                             {
                                 "name": it.get("name"),

@@ -357,3 +357,49 @@ async def test_read_shared_404_message():
     s._graph_request = AsyncMock(side_effect=Exception("Graph API error (404): gone"))
     res = await s._call_tool_impl("m365_read_shared", {"sharing_url": "https://s/d"})
     assert res["success"] is False and "not found" in res["error"]
+
+
+def _shared_item_graph_shape(name, drive, item, sharer="Alice Example"):
+    """Shape /me/drive/sharedWithMe actually returns (captured from live Graph).
+
+    Graph leaves createdBy null on these entries and reports the sharer under
+    remoteItem.shared.sharedBy, so a fixture modelled on createdBy alone cannot
+    tell whether the mapping works.
+    """
+    return {
+        "name": name,
+        "webUrl": f"https://w/{item}",
+        "lastModifiedDateTime": "2026-06-17T09:46:26Z",
+        "createdBy": None,
+        "remoteItem": {
+            "id": item,
+            "parentReference": {"driveId": drive},
+            "createdBy": None,
+            "lastModifiedBy": None,
+            "shared": {
+                "scope": "users",
+                "sharedDateTime": "2026-06-17T09:47:00Z",
+                "sharedBy": {"user": {"displayName": sharer}},
+            },
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_list_shared_reports_who_shared_the_item():
+    s = _server()
+    s._graph_request = AsyncMock(
+        return_value={"value": [_shared_item_graph_shape("a.docx", "D", "I1")]}
+    )
+    res = await s._call_tool_impl("m365_list_shared", {})
+    assert res["items"][0]["shared_by"] == "Alice Example"
+
+
+@pytest.mark.asyncio
+async def test_list_shared_survives_a_share_block_without_an_identity():
+    s = _server()
+    item = _shared_item_graph_shape("a.docx", "D", "I1")
+    item["remoteItem"]["shared"] = {"scope": "anonymous"}
+    s._graph_request = AsyncMock(return_value={"value": [item]})
+    res = await s._call_tool_impl("m365_list_shared", {})
+    assert res["success"] is True and res["items"][0]["shared_by"] is None
