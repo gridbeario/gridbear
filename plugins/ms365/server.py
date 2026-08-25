@@ -68,8 +68,10 @@ def _graph_error_message(err: Exception, action: str) -> str:
     msg = str(err)
     if "(403)" in msg:
         return (
-            "access denied — the token likely lacks Files.Read.All; "
-            "re-authenticate this account with the broader scope"
+            "access denied — either this account lacks Files.Read.All "
+            "(re-authenticate it with the broader scope), or the item lives in "
+            "another tenant where the access is a guest grant, which a token "
+            "issued by this account's own tenant cannot use"
         )
     if "(404)" in msg:
         return "not found — link expired/revoked, or not shared to this account"

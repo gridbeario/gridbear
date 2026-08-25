@@ -438,3 +438,15 @@ async def test_list_sites_encodes_a_search_term_with_special_characters():
         call_args[0], call_args[1], params=call_kwargs.get("params")
     )
     assert "R%26D" in str(built.url), str(built.url)
+
+
+def test_denied_message_names_both_plausible_causes():
+    """A 403 on a shared item has two very different causes.
+
+    Blaming the scope alone sends the operator to re-authenticate an account
+    that already carries Files.Read.All, when the item may simply live in a
+    tenant where their access is a guest grant.
+    """
+    msg = srv._graph_error_message(Exception("Graph API error (403): denied"), "read")
+    assert "Files.Read.All" in msg
+    assert "tenant" in msg.lower()
