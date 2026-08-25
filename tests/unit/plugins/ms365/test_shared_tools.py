@@ -403,3 +403,38 @@ async def test_list_shared_survives_a_share_block_without_an_identity():
     s._graph_request = AsyncMock(return_value={"value": [item]})
     res = await s._call_tool_impl("m365_list_shared", {})
     assert res["success"] is True and res["items"][0]["shared_by"] is None
+
+
+@pytest.mark.asyncio
+async def test_list_sites_keeps_the_search_term_in_the_request():
+    """httpx drops a URL's existing query when params= is also given.
+
+    Asserting the call shape is not enough — the check has to go through the
+    request httpx actually builds, which is where the term was being lost.
+    """
+    import httpx
+
+    s = _server()
+    s._graph_request = AsyncMock(return_value={"value": []})
+    await s._call_tool_impl("m365_list_sites", {"search": "Contoso"})
+
+    call_args, call_kwargs = s._graph_request.call_args
+    built = httpx.Client(base_url="https://graph.microsoft.com/v1.0").build_request(
+        call_args[0], call_args[1], params=call_kwargs.get("params")
+    )
+    assert "search=Contoso" in str(built.url), str(built.url)
+
+
+@pytest.mark.asyncio
+async def test_list_sites_encodes_a_search_term_with_special_characters():
+    import httpx
+
+    s = _server()
+    s._graph_request = AsyncMock(return_value={"value": []})
+    await s._call_tool_impl("m365_list_sites", {"search": "R&D team"})
+
+    call_args, call_kwargs = s._graph_request.call_args
+    built = httpx.Client(base_url="https://graph.microsoft.com/v1.0").build_request(
+        call_args[0], call_args[1], params=call_kwargs.get("params")
+    )
+    assert "R%26D" in str(built.url), str(built.url)

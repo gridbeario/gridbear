@@ -585,8 +585,12 @@ class MS365Server:
         # SharePoint tools
         if name == "m365_list_sites":
             search = args.get("search", "*")
+            # search goes through params, not the path: httpx replaces a URL's
+            # existing query when params is given, which silently dropped the
+            # term and made every listing come back empty. Passing it here also
+            # encodes terms containing & or spaces.
             result = await self._graph_request(
-                "GET", f"/sites?search={search}", params={"$top": "50"}
+                "GET", "/sites", params={"search": search, "$top": "50"}
             )
             if isinstance(result, dict) and "value" in result:
                 sites = [
