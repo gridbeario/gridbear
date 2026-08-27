@@ -52,7 +52,6 @@ COPY core/__version__.py core/__version__.py
 # Install all optional groups (plugins need their deps at runtime)
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system ".[dev,all]" && \
-    uv pip install --system "starlette<1.0.0" && \
     uv pip install --system py-spy
 
 # B5: Pre-download embedding model (~90MB, avoids download at first startup)
