@@ -23,6 +23,10 @@ You have access to Microsoft 365 services. Available operations:
 - m365_read_drive_file(tenant, file_path) - Read file from OneDrive
 - m365_write_drive_file(tenant, file_path, content) - Write file to OneDrive
 
+**Shared with me:**
+- m365_list_shared() - List documents shared with you (Shared with me)
+- m365_read_shared(sharing_url | drive_id, item_id) - Read a shared document's text
+
 Use tags in your response to execute operations:
 [M365_LIST_SITES tenant="tenant_name"]
 [M365_LIST_FILES tenant="tenant_name" site_id="..." folder_path="/Documents"]

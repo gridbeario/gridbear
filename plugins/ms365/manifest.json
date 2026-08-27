@@ -70,7 +70,10 @@
   "dependencies": [
     "msal",
     "httpx",
-    "cryptography"
+    "cryptography",
+    "python-docx",
+    "openpyxl",
+    "pypdf"
   ],
   "private_only": true
 }

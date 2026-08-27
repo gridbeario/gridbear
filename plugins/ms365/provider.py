@@ -167,6 +167,9 @@ class MS365Provider(BaseMCPProvider):
             "m365_list_drive_files",
             "m365_read_drive_file",
             "m365_write_drive_file",
+            # Shared with me
+            "m365_list_shared",
+            "m365_read_shared",
         ]
 
         allowed = []

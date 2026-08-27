@@ -16,6 +16,14 @@ from typing import Any
 import httpx
 import msal
 
+# Launched as a bare script by provider.get_server_config, so the repo root is
+# not on sys.path. Add it before importing sibling plugin modules.
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from plugins.ms365.extract import encode_sharing_url, extract_text
+
 # MCP server imports
 try:
     from mcp.server import Server
@@ -35,6 +43,9 @@ TOKEN_DATA = os.environ.get("MS365_TOKEN_DATA", "{}")
 ROLE = os.environ.get("MS365_ROLE", "guest")
 
 GRAPH_API_BASE = "https://graph.microsoft.com/v1.0"
+MAX_INLINE_READ_BYTES = 50 * 1024 * 1024
+_SHARED_MAX_ITEMS = 200
+_SHARED_MAX_PAGES = 5
 STATE_FILE = Path("/app/data/ms365_context.json")
 
 # Parse token data
@@ -42,6 +53,29 @@ try:
     token_info = json.loads(TOKEN_DATA)
 except json.JSONDecodeError:
     token_info = {}
+
+
+class SharedReadError(Exception):
+    """Actionable, user-facing error from a shared-item read."""
+
+
+def _graph_error_message(err: Exception, action: str) -> str:
+    """Map a _graph_request exception to an actionable message.
+
+    NOTE: depends on _graph_request's message format
+    "Graph API error ({status}): {msg}". If that format changes, update this.
+    """
+    msg = str(err)
+    if "(403)" in msg:
+        return (
+            "access denied — either this account lacks Files.Read.All "
+            "(re-authenticate it with the broader scope), or the item lives in "
+            "another tenant where the access is a guest grant, which a token "
+            "issued by this account's own tenant cannot use"
+        )
+    if "(404)" in msg:
+        return "not found — link expired/revoked, or not shared to this account"
+    return f"{action} failed: {msg}"
 
 
 class MS365Server:
@@ -149,6 +183,39 @@ class MS365Server:
                         },
                         "required": ["site_id", "file_path"],
                     },
+                ),
+                Tool(
+                    name="m365_read_shared",
+                    description=(
+                        "Read a document SHARED WITH the user — by share link "
+                        "(from email) or by drive_id+item_id from m365_list_shared. "
+                        "Returns extracted text for Word/Excel/PDF."
+                    ),
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "sharing_url": {
+                                "type": "string",
+                                "description": "Share link URL (from an email/message)",
+                            },
+                            "drive_id": {
+                                "type": "string",
+                                "description": "Drive ID (from m365_list_shared)",
+                            },
+                            "item_id": {
+                                "type": "string",
+                                "description": "Item ID (from m365_list_shared)",
+                            },
+                        },
+                    },
+                ),
+                Tool(
+                    name="m365_list_shared",
+                    description=(
+                        "List documents shared WITH the user (Shared with me). "
+                        "Returns items with drive_id/item_id to pass to m365_read_shared."
+                    ),
+                    inputSchema={"type": "object", "properties": {}},
                 ),
                 Tool(
                     name="m365_write_file",
@@ -460,14 +527,72 @@ class MS365Server:
             return response.json()
         return response.content
 
+    async def _download_stream(
+        self, url: str, max_bytes: int = MAX_INLINE_READ_BYTES
+    ) -> bytes:
+        """Download a pre-authenticated URL with NO auth header, streaming with a
+        size guard. Aborts as soon as the running byte count exceeds max_bytes."""
+        buf = bytearray()
+        async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
+            async with client.stream("GET", url) as resp:
+                if resp.status_code >= 400:
+                    raise SharedReadError(f"download failed (HTTP {resp.status_code})")
+                clen = resp.headers.get("content-length")
+                if clen and clen.isdigit() and int(clen) > max_bytes:
+                    raise SharedReadError(
+                        f"file too large (>{max_bytes // (1024 * 1024)} MB) "
+                        "to read inline"
+                    )
+                async for chunk in resp.aiter_bytes():
+                    buf.extend(chunk)
+                    if len(buf) > max_bytes:
+                        raise SharedReadError(
+                            f"file too large (>{max_bytes // (1024 * 1024)} MB) "
+                            "to read inline"
+                        )
+        return bytes(buf)
+
+    async def _read_item(self, metadata: dict) -> tuple[bytes, str]:
+        """From a resolved driveItem's metadata, return (content_bytes, filename).
+        Guards folders; downloads via the pre-authenticated downloadUrl."""
+        if metadata.get("folder") is not None:
+            raise SharedReadError("shared item is a folder, not a readable document")
+        name = metadata.get("name", "file")
+        download_url = metadata.get("@microsoft.graph.downloadUrl")
+        if download_url:
+            return await self._download_stream(download_url), name
+        # Fallback (rare): a file with no downloadUrl. Fetch /content without
+        # following the redirect, read the 302 Location, download it unauthenticated.
+        drive_id = (metadata.get("parentReference") or {}).get("driveId")
+        item_id = metadata.get("id")
+        if drive_id and item_id:
+            token = await self._get_valid_token()
+            async with httpx.AsyncClient(
+                base_url=GRAPH_API_BASE, follow_redirects=False, timeout=30.0
+            ) as client:
+                resp = await client.get(
+                    f"/drives/{drive_id}/items/{item_id}/content",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
+            if resp.status_code >= 400:
+                raise SharedReadError(f"cannot read item (HTTP {resp.status_code})")
+            loc = resp.headers.get("location")
+            if loc:
+                return await self._download_stream(loc), name
+        raise SharedReadError("cannot read this item (no download URL available)")
+
     async def _call_tool_impl(self, name: str, args: dict) -> dict:
         """Execute tool and return result."""
 
         # SharePoint tools
         if name == "m365_list_sites":
             search = args.get("search", "*")
+            # search goes through params, not the path: httpx replaces a URL's
+            # existing query when params is given, which silently dropped the
+            # term and made every listing come back empty. Passing it here also
+            # encodes terms containing & or spaces.
             result = await self._graph_request(
-                "GET", f"/sites?search={search}", params={"$top": "50"}
+                "GET", "/sites", params={"search": search, "$top": "50"}
             )
             if isinstance(result, dict) and "value" in result:
                 sites = [
@@ -568,15 +693,101 @@ class MS365Server:
             if isinstance(content, bytes):
                 try:
                     text = content.decode("utf-8")
-                    if len(text) > 10000:
-                        text = text[:10000] + "\n...(truncated)"
-                    return {"success": True, "content": text, "file_path": file_path}
+                    if len(text) > 50_000:
+                        text = text[:50_000] + "\n...(truncated)"
                 except UnicodeDecodeError:
-                    return {
-                        "success": False,
-                        "error": "Binary file cannot be displayed as text",
-                    }
+                    text = extract_text(content, file_path, max_chars=50_000)
+                return {"success": True, "content": text, "file_path": file_path}
             return {"success": False, "error": "Could not read file"}
+
+        elif name == "m365_read_shared":
+            sharing_url = args.get("sharing_url")
+            drive_id = args.get("drive_id")
+            item_id = args.get("item_id")
+            has_pair = bool(drive_id) and bool(item_id)
+            if sharing_url and (drive_id or item_id):
+                return {
+                    "success": False,
+                    "error": "provide only one of: sharing_url, or drive_id+item_id",
+                }
+            if not sharing_url and (bool(drive_id) != bool(item_id)):
+                return {
+                    "success": False,
+                    "error": "drive_id and item_id must be supplied together",
+                }
+            if not sharing_url and not has_pair:
+                return {
+                    "success": False,
+                    "error": "provide either sharing_url or both drive_id and item_id",
+                }
+            try:
+                if sharing_url:
+                    endpoint = f"/shares/{encode_sharing_url(sharing_url)}/driveItem"
+                else:
+                    endpoint = f"/drives/{drive_id}/items/{item_id}"
+                metadata = await self._graph_request("GET", endpoint)
+                if not isinstance(metadata, dict):
+                    return {"success": False, "error": "could not resolve shared item"}
+                content, fname = await self._read_item(metadata)
+                text = extract_text(content, fname, max_chars=50_000)
+                return {"success": True, "content": text, "name": fname}
+            except SharedReadError as err:
+                return {"success": False, "error": str(err)}
+            except Exception as err:
+                return {"success": False, "error": _graph_error_message(err, "read")}
+
+        elif name == "m365_list_shared":
+            items = []
+            truncated = False
+            endpoint = "/me/drive/sharedWithMe"
+            try:
+                for _page in range(_SHARED_MAX_PAGES):
+                    data = await self._graph_request("GET", endpoint)
+                    if not isinstance(data, dict):
+                        break
+                    for it in data.get("value", []):
+                        remote = it.get("remoteItem") or {}
+                        parent = remote.get("parentReference") or {}
+                        # Graph reports the sharer under shared.sharedBy on
+                        # sharedWithMe entries and leaves createdBy null there;
+                        # createdBy stays as a fallback for other shapes.
+                        shared = remote.get("shared") or {}
+                        sharer = (shared.get("sharedBy") or {}).get("user") or {}
+                        shared_by = sharer.get("displayName")
+                        if not shared_by:
+                            created = (
+                                remote.get("createdBy") or it.get("createdBy") or {}
+                            )
+                            shared_by = (created.get("user") or {}).get("displayName")
+                        items.append(
+                            {
+                                "name": it.get("name"),
+                                "shared_by": shared_by,
+                                "last_modified": it.get("lastModifiedDateTime"),
+                                "drive_id": parent.get("driveId"),
+                                "item_id": remote.get("id"),
+                                "web_url": it.get("webUrl"),
+                                "is_folder": remote.get("folder") is not None,
+                            }
+                        )
+                        if len(items) >= _SHARED_MAX_ITEMS:
+                            truncated = True
+                            break
+                    next_link = data.get("@odata.nextLink")
+                    if truncated or not next_link:
+                        break
+                    endpoint = next_link  # absolute URL — httpx uses it as-is
+                else:
+                    # loop ran the full page cap without a break → more pages exist
+                    truncated = True
+                return {
+                    "success": True,
+                    "count": len(items),
+                    "items": items,
+                    "truncated": truncated,
+                }
+            except Exception as err:
+                return {"success": False, "error": _graph_error_message(err, "list")}
 
         elif name == "m365_write_file":
             site_id = args["site_id"]
@@ -872,11 +1083,11 @@ class MS365Server:
             if isinstance(content, bytes):
                 try:
                     text = content.decode("utf-8")
-                    if len(text) > 10000:
-                        text = text[:10000] + "\n...(truncated)"
-                    return {"success": True, "content": text, "file_path": file_path}
+                    if len(text) > 50_000:
+                        text = text[:50_000] + "\n...(truncated)"
                 except UnicodeDecodeError:
-                    return {"success": False, "error": "Binary file"}
+                    text = extract_text(content, file_path, max_chars=50_000)
+                return {"success": True, "content": text, "file_path": file_path}
             return {"success": False, "error": "Could not read file"}
 
         elif name == "m365_write_drive_file":
