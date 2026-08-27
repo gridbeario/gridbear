@@ -74,6 +74,7 @@ async def permissions_page(request: Request, _: bool = Depends(require_login)):
 
     plugin_menus = getattr(request.state, "plugin_menus", [])
     return templates.TemplateResponse(
+        request,
         "permissions.html",
         {
             "request": request,

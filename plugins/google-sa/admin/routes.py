@@ -94,6 +94,7 @@ async def google_sa_index(request: Request, user: dict = Depends(require_login))
     has_sa, sa_email = _get_global_sa()
 
     return templates.TemplateResponse(
+        request,
         "plugins/google_sa.html",
         get_template_context(
             request,

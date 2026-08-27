@@ -867,6 +867,7 @@ async def dashboard(request: Request, _: dict = Depends(require_login)):
     }
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         get_template_context(
             request,

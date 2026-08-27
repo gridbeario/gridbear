@@ -217,6 +217,7 @@ async def plugins_list(request: Request, _: bool = Depends(require_login)):
     plugins = await get_all_plugins()
 
     return templates.TemplateResponse(
+        request,
         "plugins/list.html",
         get_template_context(
             request,
@@ -297,6 +298,7 @@ async def plugin_paths_page(request: Request, _: bool = Depends(require_login)):
         )
 
     return templates.TemplateResponse(
+        request,
         "plugins/paths.html",
         get_template_context(request, plugin_paths=paths),
     )
@@ -400,6 +402,7 @@ async def plugin_config(
         runner_ctx = _get_runner_context(plugin_name)
 
     return templates.TemplateResponse(
+        request,
         "plugins/config.html",
         get_template_context(
             request,

@@ -67,6 +67,7 @@ async def github_index(request: Request, user: dict = Depends(require_login)):
     plugin_info = get_plugin_info("github")
 
     return templates.TemplateResponse(
+        request,
         "plugins/github.html",
         get_template_context(
             request,
@@ -111,6 +112,7 @@ async def save_settings(
 async def add_repo_form(request: Request, user: dict = Depends(require_login)):
     """Show add repository form."""
     return templates.TemplateResponse(
+        request,
         "plugins/github_repo.html",
         get_template_context(
             request,
@@ -141,6 +143,7 @@ async def edit_repo_form(
         raise HTTPException(status_code=404, detail="Repository not found")
 
     return templates.TemplateResponse(
+        request,
         "plugins/github_repo.html",
         get_template_context(
             request,

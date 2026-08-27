@@ -38,6 +38,7 @@ async def image_config_page(request: Request, _: bool = Depends(require_login)):
     providers = discover_providers(BASE_PLUGIN_NAME)
 
     return templates.TemplateResponse(
+        request,
         "image_config.html",
         get_template_context(
             request,

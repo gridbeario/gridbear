@@ -93,6 +93,7 @@ async def skills_list(request: Request, _=Depends(require_login)):
         by_plugin[plugin].append(skill)
 
     return templates.TemplateResponse(
+        request,
         "skills.html",
         get_plugin_template_context(
             request,
@@ -110,6 +111,7 @@ async def skills_list(request: Request, _=Depends(require_login)):
 async def skill_new(request: Request, _=Depends(require_login)):
     """Show form to create a new skill."""
     return templates.TemplateResponse(
+        request,
         "skill_edit.html",
         get_plugin_template_context(
             request,
@@ -172,6 +174,7 @@ async def skill_detail(request: Request, skill_id: int, _=Depends(require_login)
         skill["username"] = "System"
 
     return templates.TemplateResponse(
+        request,
         "skill_edit.html",
         get_plugin_template_context(
             request,

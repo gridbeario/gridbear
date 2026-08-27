@@ -255,6 +255,7 @@ async def agents_list(request: Request, _: dict = Depends(require_login)):
         pass
 
     return get_templates().TemplateResponse(
+        request,
         "agents/list.html",
         get_template_context(
             request,
@@ -434,6 +435,7 @@ async def new_agent(request: Request, _: dict = Depends(require_login)):
     known_users = get_known_users()
 
     return get_templates().TemplateResponse(
+        request,
         "agents/edit.html",
         get_template_context(
             request,
@@ -462,6 +464,7 @@ async def edit_agent(request: Request, agent_id: str, _: dict = Depends(require_
     known_users = get_known_users()
 
     return get_templates().TemplateResponse(
+        request,
         "agents/edit.html",
         get_template_context(
             request,

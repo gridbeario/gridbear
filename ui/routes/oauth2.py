@@ -33,6 +33,7 @@ async def list_clients(request: Request, _: dict = Depends(require_login)):
     stats = db.get_stats()
 
     return templates.TemplateResponse(
+        request,
         "oauth2/clients.html",
         get_ctx(request, clients=clients, stats=stats),
     )
@@ -44,6 +45,7 @@ async def new_client_form(request: Request, _: dict = Depends(require_login)):
     templates, get_ctx = get_templates()
 
     return templates.TemplateResponse(
+        request,
         "oauth2/client_edit.html",
         get_ctx(request, client=None, is_new=True, secret=None),
     )
@@ -82,6 +84,7 @@ async def create_client(
     # Redirect to client detail with secret shown once
     templates, get_ctx = get_templates()
     return templates.TemplateResponse(
+        request,
         "oauth2/client_edit.html",
         get_ctx(
             request,
@@ -107,6 +110,7 @@ async def view_client(
 
     templates, get_ctx = get_templates()
     return templates.TemplateResponse(
+        request,
         "oauth2/client_edit.html",
         get_ctx(request, client=client, is_new=False, secret=None, tokens=tokens),
     )
@@ -163,6 +167,7 @@ async def regenerate_secret(
     client = db.get_client_by_id(client_pk)
     templates, get_ctx = get_templates()
     return templates.TemplateResponse(
+        request,
         "oauth2/client_edit.html",
         get_ctx(
             request,

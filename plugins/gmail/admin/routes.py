@@ -44,6 +44,7 @@ async def gmail_accounts_page(request: Request, _: bool = Depends(require_login)
 
     plugin_menus = getattr(request.state, "plugin_menus", [])
     return templates.TemplateResponse(
+        request,
         "gmail.html",
         {
             "request": request,
@@ -63,6 +64,7 @@ async def start_oauth(request: Request, token: str):
 
     if not token_data:
         return templates.TemplateResponse(
+            request,
             "oauth_error.html",
             {
                 "request": request,
@@ -98,6 +100,7 @@ async def oauth_callback(
     """Handle OAuth callback from Google."""
     if error:
         return templates.TemplateResponse(
+            request,
             "oauth_error.html",
             {
                 "request": request,
@@ -107,6 +110,7 @@ async def oauth_callback(
 
     if not code:
         return templates.TemplateResponse(
+            request,
             "oauth_error.html",
             {
                 "request": request,
@@ -117,6 +121,7 @@ async def oauth_callback(
     stored_state = request.session.get("oauth_state")
     if not state or state != stored_state:
         return templates.TemplateResponse(
+            request,
             "oauth_error.html",
             {
                 "request": request,
@@ -127,6 +132,7 @@ async def oauth_callback(
     oauth_token = request.session.get("oauth_token")
     if not oauth_token:
         return templates.TemplateResponse(
+            request,
             "oauth_error.html",
             {
                 "request": request,
@@ -139,6 +145,7 @@ async def oauth_callback(
 
     if not token_data:
         return templates.TemplateResponse(
+            request,
             "oauth_error.html",
             {
                 "request": request,
@@ -198,6 +205,7 @@ async def oauth_callback(
         request.session.pop("oauth_state", None)
 
         return templates.TemplateResponse(
+            request,
             "oauth_success.html",
             {
                 "request": request,
@@ -207,6 +215,7 @@ async def oauth_callback(
 
     except Exception as e:
         return templates.TemplateResponse(
+            request,
             "oauth_error.html",
             {
                 "request": request,

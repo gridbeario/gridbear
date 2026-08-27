@@ -57,6 +57,7 @@ async def settings_page(request: Request, _=Depends(require_login)):
     dump_prompts = bool(SystemConfig.get_param_sync("dump_prompts"))
 
     return templates.TemplateResponse(
+        request,
         "settings.html",
         get_template_context(
             request,

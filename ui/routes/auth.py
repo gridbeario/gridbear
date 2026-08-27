@@ -174,6 +174,7 @@ async def login_page(request: Request):
         error = "Session expired. Please log in again."
 
     return templates.TemplateResponse(
+        request,
         "auth/login.html",
         {
             "request": request,
@@ -209,6 +210,7 @@ async def login(
             details="User not found",
         )
         return templates.TemplateResponse(
+            request,
             "auth/login.html",
             {
                 "request": request,
@@ -226,6 +228,7 @@ async def login(
             details="Account locked out",
         )
         return templates.TemplateResponse(
+            request,
             "auth/login.html",
             {
                 "request": request,
@@ -251,6 +254,7 @@ async def login(
                 details=f"Locked after {failed} failed attempts",
             )
             return templates.TemplateResponse(
+                request,
                 "auth/login.html",
                 {
                     "request": request,
@@ -267,6 +271,7 @@ async def login(
             details=f"Wrong password (attempt {failed})",
         )
         return templates.TemplateResponse(
+            request,
             "auth/login.html",
             {
                 "request": request,
@@ -328,6 +333,7 @@ async def twofa_page(request: Request):
     has_webauthn = bool(user.get("webauthn_enabled")) if user else False
 
     return templates.TemplateResponse(
+        request,
         "auth/2fa.html",
         {
             "request": request,
@@ -444,6 +450,7 @@ async def verify_2fa(
             details=f"Max attempts ({attempts}) reached",
         )
         return templates.TemplateResponse(
+            request,
             "auth/login.html",
             {
                 "request": request,
@@ -461,6 +468,7 @@ async def verify_2fa(
     )
 
     return templates.TemplateResponse(
+        request,
         "auth/2fa.html",
         {
             "request": request,
@@ -484,6 +492,7 @@ async def twofa_choice_page(request: Request):
         return RedirectResponse(url="/auth/login", status_code=303)
 
     return templates.TemplateResponse(
+        request,
         "auth/2fa_choice.html",
         {
             "request": request,
@@ -516,6 +525,7 @@ async def twofa_passkey_page(request: Request):
     has_totp = bool(user.get("totp_enabled"))
 
     return templates.TemplateResponse(
+        request,
         "auth/2fa_passkey.html",
         {
             "request": request,
@@ -641,6 +651,7 @@ async def webauthn_setup_page(
     )
 
     return templates.TemplateResponse(
+        request,
         "auth/webauthn_setup.html",
         {
             "request": request,
@@ -775,6 +786,7 @@ async def setup_page(request: Request):
         return RedirectResponse(url="/auth/login", status_code=303)
 
     return templates.TemplateResponse(
+        request,
         "auth/setup.html",
         {
             "request": request,
@@ -810,6 +822,7 @@ async def setup(
 
     if errors:
         return templates.TemplateResponse(
+            request,
             "auth/setup.html",
             {
                 "request": request,
@@ -867,6 +880,7 @@ async def twofa_setup_page(request: Request):
     qr_code = totp_manager.generate_qr_code(secret, user["username"])
 
     return templates.TemplateResponse(
+        request,
         "auth/2fa_setup.html",
         {
             "request": request,
@@ -899,6 +913,7 @@ async def twofa_setup(
     if not totp_manager.verify_code(secret, code):
         qr_code = totp_manager.generate_qr_code(secret, user["username"])
         return templates.TemplateResponse(
+            request,
             "auth/2fa_setup.html",
             {
                 "request": request,
@@ -931,6 +946,7 @@ async def twofa_setup(
     formatted_codes = recovery_manager.format_codes_for_display(recovery_codes)
 
     return templates.TemplateResponse(
+        request,
         "auth/recovery.html",
         {
             "request": request,
@@ -961,6 +977,7 @@ async def logout(request: Request):
 async def change_password_page(request: Request, user: dict = Depends(require_user)):
     """Display password change form."""
     return templates.TemplateResponse(
+        request,
         "change_password.html",
         get_template_context(
             request,
@@ -992,6 +1009,7 @@ async def change_password(
             details="Wrong current password",
         )
         return templates.TemplateResponse(
+            request,
             "change_password.html",
             get_template_context(
                 request,
@@ -1003,6 +1021,7 @@ async def change_password(
 
     if new_password != new_password_confirm:
         return templates.TemplateResponse(
+            request,
             "change_password.html",
             get_template_context(
                 request,
@@ -1014,6 +1033,7 @@ async def change_password(
 
     if len(new_password) < MIN_PASSWORD_LENGTH:
         return templates.TemplateResponse(
+            request,
             "change_password.html",
             get_template_context(
                 request,
@@ -1033,6 +1053,7 @@ async def change_password(
     )
 
     return templates.TemplateResponse(
+        request,
         "change_password.html",
         get_template_context(
             request,
@@ -1062,6 +1083,7 @@ async def security_page(request: Request, user: dict = Depends(require_user)):
     success = request.query_params.get("success")
 
     return templates.TemplateResponse(
+        request,
         "auth/security.html",
         get_template_context(
             request,
@@ -1146,6 +1168,7 @@ async def regenerate_recovery(
     )
 
     return templates.TemplateResponse(
+        request,
         "auth/recovery.html",
         {
             "request": request,
@@ -1208,6 +1231,7 @@ async def revoke_all_sessions(request: Request, user: dict = Depends(require_use
 async def forgot_password_page(request: Request):
     """Display the password-reset request form."""
     return templates.TemplateResponse(
+        request,
         "auth/forgot_password.html",
         {"request": request, "submitted": False},
     )
@@ -1228,6 +1252,7 @@ async def forgot_password(request: Request, email: str = Form(...)):
     # host, not whatever host this request arrived on (proxy/curl/localhost).
     base_url = os.environ.get("GRIDBEAR_BASE_URL") or str(request.base_url)
     return templates.TemplateResponse(
+        request,
         "auth/forgot_password.html",
         {"request": request, "submitted": True},
         background=BackgroundTask(request_password_reset, email, base_url),
@@ -1245,6 +1270,7 @@ async def setup_password_page(request: Request):
     raw_token = request.query_params.get("token", "")
     if not raw_token:
         return templates.TemplateResponse(
+            request,
             "auth/setup_password.html",
             {
                 "request": request,
@@ -1257,6 +1283,7 @@ async def setup_password_page(request: Request):
     token_data = validate_token(raw_token)
     if not token_data:
         return templates.TemplateResponse(
+            request,
             "auth/setup_password.html",
             {
                 "request": request,
@@ -1267,6 +1294,7 @@ async def setup_password_page(request: Request):
         )
 
     return templates.TemplateResponse(
+        request,
         "auth/setup_password.html",
         {
             "request": request,
@@ -1293,6 +1321,7 @@ async def setup_password(
     token_data = validate_token(token)
     if not token_data:
         return templates.TemplateResponse(
+            request,
             "auth/setup_password.html",
             {
                 "request": request,
@@ -1304,6 +1333,7 @@ async def setup_password(
 
     if password != password_confirm:
         return templates.TemplateResponse(
+            request,
             "auth/setup_password.html",
             {
                 "request": request,
@@ -1318,6 +1348,7 @@ async def setup_password(
 
     if len(password) < MIN_PASSWORD_LENGTH:
         return templates.TemplateResponse(
+            request,
             "auth/setup_password.html",
             {
                 "request": request,
@@ -1334,6 +1365,7 @@ async def setup_password(
     consume_token(token_data["token_id"])
 
     return templates.TemplateResponse(
+        request,
         "auth/setup_password.html",
         {
             "request": request,

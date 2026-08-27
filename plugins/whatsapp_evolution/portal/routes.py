@@ -134,6 +134,7 @@ async def whatsapp_connect_page(
     ]
 
     return templates.TemplateResponse(
+        request,
         "me/connect_whatsapp.html",
         {
             "request": request,
@@ -375,6 +376,7 @@ async def whatsapp_authorized_numbers(
         state = status_data.get("instance", {}).get("state", "unknown")
 
     return templates.TemplateResponse(
+        request,
         "me/whatsapp_authorized.html",
         {
             "request": request,

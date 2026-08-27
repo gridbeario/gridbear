@@ -196,6 +196,7 @@ async def tools_dashboard(request: Request, _: dict = Depends(require_login)):
     data = await _get_dashboard_data()
 
     return get_templates().TemplateResponse(
+        request,
         "tools/dashboard.html",
         get_template_context(request, **data),
     )
@@ -258,6 +259,7 @@ async def agent_tools_page(
             pass
 
     return get_templates().TemplateResponse(
+        request,
         "tools/agent_tools.html",
         get_template_context(
             request,

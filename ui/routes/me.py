@@ -448,6 +448,7 @@ async def dashboard(request: Request, user: dict = Depends(require_user)):
     await _notify_expired_tokens(connections, user)
 
     return templates.TemplateResponse(
+        request,
         "me/dashboard.html",
         {
             "request": request,
@@ -467,6 +468,7 @@ async def profile_page(request: Request, user: dict = Depends(require_user)):
     from core.i18n import get_active_languages
 
     return templates.TemplateResponse(
+        request,
         "me/profile.html",
         {
             "request": request,
@@ -562,6 +564,7 @@ async def connections_page(request: Request, user: dict = Depends(require_user))
     await _notify_expired_tokens(connections, user)
 
     return templates.TemplateResponse(
+        request,
         "me/connections.html",
         {
             "request": request,
@@ -606,6 +609,7 @@ async def connection_connect(
 
     if auth_type == "api_key":
         return templates.TemplateResponse(
+            request,
             "me/connect_api_key.html",
             {
                 "request": request,
@@ -617,6 +621,7 @@ async def connection_connect(
         )
     elif auth_type == "credentials":
         return templates.TemplateResponse(
+            request,
             "me/connect_credentials.html",
             {
                 "request": request,
@@ -686,6 +691,7 @@ async def connection_connect(
 
         # Fallback: show a generic token input form
         return templates.TemplateResponse(
+            request,
             "me/connect_api_key.html",
             {
                 "request": request,
@@ -920,6 +926,7 @@ async def tools_page(request: Request, user: dict = Depends(require_user)):
             pass
 
     return templates.TemplateResponse(
+        request,
         "me/tools.html",
         {
             "request": request,
@@ -961,6 +968,7 @@ async def chat_page(request: Request, user: dict = Depends(require_user)):
     agents = _get_user_agents(user)
 
     return templates.TemplateResponse(
+        request,
         "me/chat.html",
         {
             "request": request,
@@ -991,11 +999,13 @@ async def chat_join_page(
 
     if not row:
         return templates.TemplateResponse(
+            request,
             "me/chat_join.html",
             {"request": request, "user": user, "error": "Invite expired or invalid"},
         )
 
     return templates.TemplateResponse(
+        request,
         "me/chat_join.html",
         {
             "request": request,

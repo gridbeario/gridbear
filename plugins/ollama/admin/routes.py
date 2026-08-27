@@ -81,6 +81,7 @@ async def ollama_config_page(request: Request, _: bool = Depends(require_login))
     runner_ctx = _get_runner_context("ollama")
 
     return templates.TemplateResponse(
+        request,
         "plugins/ollama.html",
         get_template_context(
             request,

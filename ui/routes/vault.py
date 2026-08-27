@@ -32,6 +32,7 @@ async def vault_list(request: Request, user: dict = Depends(require_user)):
     uid = _uid(user)
     services = list_services(uid)
     return templates.TemplateResponse(
+        request,
         "me/vault.html",
         {"request": request, "user": user, "services": services},
     )
@@ -41,6 +42,7 @@ async def vault_list(request: Request, user: dict = Depends(require_user)):
 async def vault_add_form(request: Request, user: dict = Depends(require_user)):
     """Show the add-service form."""
     return templates.TemplateResponse(
+        request,
         "me/vault_form.html",
         {
             "request": request,
@@ -62,6 +64,7 @@ async def vault_add(request: Request, user: dict = Depends(require_user)):
     if not validate_service_id(service_id):
         services = list_services(uid)
         return templates.TemplateResponse(
+            request,
             "me/vault.html",
             {
                 "request": request,
@@ -74,6 +77,7 @@ async def vault_add(request: Request, user: dict = Depends(require_user)):
     if get_service(uid, service_id) is not None:
         services = list_services(uid)
         return templates.TemplateResponse(
+            request,
             "me/vault.html",
             {
                 "request": request,
@@ -108,6 +112,7 @@ async def vault_edit_form(
         return RedirectResponse(url="/me/vault", status_code=303)
     creds_for_js = [{"key": c.key, "secret": c.secret} for c in entry.credentials]
     return templates.TemplateResponse(
+        request,
         "me/vault_form.html",
         {
             "request": request,

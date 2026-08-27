@@ -13,8 +13,8 @@ dependencies = [
     "pyyaml>=6.0",
     "filelock>=3.13.0",
     # Web / Admin UI
-    "fastapi>=0.131.0,<0.139.1",
-    "starlette>=0.40.0,<0.51.0",
+    "fastapi>=0.135.0,<0.139.1",
+    "starlette>=1.0.0,<2.0.0",
     "uvicorn>=0.27.0",
     "jinja2>=3.1.0",
     "itsdangerous>=2.1.0",

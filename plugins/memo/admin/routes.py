@@ -73,6 +73,7 @@ async def memo_list(request: Request, _=Depends(require_login)):
         memo["username"] = user_map.get(key, str(memo["user_id"]))
 
     return templates.TemplateResponse(
+        request,
         "memo.html",
         get_plugin_template_context(
             request,
@@ -105,6 +106,7 @@ async def memo_detail(request: Request, memo_id: int, _=Depends(require_login)):
     memo["username"] = user_map.get(key, str(memo["user_id"]))
 
     return templates.TemplateResponse(
+        request,
         "memo_edit.html",
         get_plugin_template_context(
             request,
