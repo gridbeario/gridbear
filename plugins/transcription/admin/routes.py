@@ -38,6 +38,7 @@ async def transcription_config_page(request: Request, _: bool = Depends(require_
     providers = discover_providers(BASE_PLUGIN_NAME)
 
     return templates.TemplateResponse(
+        request,
         "transcription_config.html",
         get_template_context(
             request,

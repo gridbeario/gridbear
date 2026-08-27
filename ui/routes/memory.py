@@ -51,6 +51,7 @@ async def memory_page(request: Request, _: bool = Depends(require_login)):
     config = ConfigManager()
     plugin_menus = getattr(request.state, "plugin_menus", [])
     return templates.TemplateResponse(
+        request,
         "memory.html",
         {
             "request": request,
@@ -258,6 +259,7 @@ async def memory_browse_page(
         total_pages = 1
 
     return templates.TemplateResponse(
+        request,
         "memory_browse.html",
         {
             "request": request,

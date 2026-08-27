@@ -37,6 +37,7 @@ async def whatsapp_api_dashboard(request: Request, _=Depends(require_login)):
     agent_channels = _get_agent_whatsapp_configs()
 
     return templates.TemplateResponse(
+        request,
         "whatsapp_api.html",
         get_plugin_template_context(
             request,

@@ -67,6 +67,7 @@ async def list_artifacts(
         enriched.append(r)
 
     return templates.TemplateResponse(
+        request,
         "list.html",
         get_plugin_template_context(
             request,
@@ -94,6 +95,7 @@ async def artifact_detail(request: Request, uuid: str, _=Depends(require_login))
         uuid, share_token=row.get("share_token")
     )
     return templates.TemplateResponse(
+        request,
         "detail.html",
         get_plugin_template_context(request, PLUGIN_DIR, artifact=row),
     )

@@ -114,6 +114,7 @@ async def livekit_page(request: Request, _=Depends(require_login)):
         active_calls = await _service.list_active_calls()
 
     return templates.TemplateResponse(
+        request,
         "livekit.html",
         get_plugin_template_context(
             request,
@@ -295,6 +296,7 @@ async def call_page(room_name: str, request: Request):
             pass
 
         return templates.TemplateResponse(
+            request,
             "call_standalone.html",
             {
                 "request": request,
@@ -314,6 +316,7 @@ async def call_page(room_name: str, request: Request):
         if svc_session:
             agent_info = _get_agent_info(svc_session.agent_id)
             return templates.TemplateResponse(
+                request,
                 "call_standalone.html",
                 {
                     "request": request,
@@ -326,6 +329,7 @@ async def call_page(room_name: str, request: Request):
             )
 
     return templates.TemplateResponse(
+        request,
         "call_standalone.html",
         {
             "request": request,

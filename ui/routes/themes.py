@@ -111,6 +111,7 @@ async def themes_page(request: Request, _=Depends(require_login)):
     themes, active_theme = _discover_themes()
 
     return get_templates().TemplateResponse(
+        request,
         "themes.html",
         get_template_context(
             request,

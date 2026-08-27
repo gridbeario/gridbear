@@ -171,6 +171,7 @@ async def authorize_get(
 
     # Show consent page
     return templates.TemplateResponse(
+        request,
         "oauth2/consent.html",
         {
             "request": request,

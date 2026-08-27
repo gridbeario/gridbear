@@ -53,6 +53,7 @@ async def companies_page(request: Request, _: dict = Depends(require_login)):
         )
 
     return templates.TemplateResponse(
+        request,
         "companies.html",
         get_template_context(
             request,
@@ -149,6 +150,7 @@ async def company_detail(
 
     config = ConfigManager()
     return templates.TemplateResponse(
+        request,
         "company_detail.html",
         get_template_context(
             request,

@@ -34,6 +34,7 @@ async def google_sheets_index(request: Request, user: dict = Depends(require_log
     plugin_info = get_plugin_info("google-sheets")
 
     return templates.TemplateResponse(
+        request,
         "plugins/google_sheets.html",
         get_template_context(
             request,

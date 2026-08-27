@@ -134,6 +134,7 @@ async def rest_api_page(request: Request, _=Depends(require_login)):
     schema_order = sorted(grouped.keys(), key=lambda s: (priority.get(s, 99), s))
 
     return get_templates().TemplateResponse(
+        request,
         "rest_api.html",
         get_template_context(
             request,

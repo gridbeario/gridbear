@@ -64,6 +64,7 @@ async def users_page(request: Request, _: bool = Depends(require_login)):
             u["locale"] = "en"
 
     return templates.TemplateResponse(
+        request,
         "users.html",
         get_template_context(
             request,

@@ -97,6 +97,7 @@ async def ms365_index(request: Request, user: dict = Depends(require_login)):
     plugin_info = get_plugin_info("ms365")
 
     return templates.TemplateResponse(
+        request,
         "plugins/ms365.html",
         get_template_context(
             request,
@@ -146,6 +147,7 @@ async def save_settings(
 async def add_tenant_form(request: Request, user: dict = Depends(require_login)):
     """Show add tenant form."""
     return templates.TemplateResponse(
+        request,
         "plugins/ms365_tenant.html",
         get_template_context(
             request,
@@ -176,6 +178,7 @@ async def edit_tenant_form(
         raise HTTPException(status_code=404, detail="Tenant not found")
 
     return templates.TemplateResponse(
+        request,
         "plugins/ms365_tenant.html",
         get_template_context(
             request,

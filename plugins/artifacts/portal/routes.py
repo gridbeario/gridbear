@@ -52,6 +52,7 @@ async def me_artifacts(request: Request, user: dict = Depends(require_user)):
         rows = []
 
     return templates.TemplateResponse(
+        request,
         "me_artifacts.html",
         {"request": request, "user": user, "artifacts": rows},
     )

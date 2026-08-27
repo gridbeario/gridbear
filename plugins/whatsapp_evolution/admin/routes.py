@@ -129,6 +129,7 @@ async def whatsapp_dashboard(request: Request, _=Depends(require_login)):
     instances = await _get_instances_status() if api_key else []
 
     return templates.TemplateResponse(
+        request,
         "whatsapp/index.html",
         get_plugin_template_context(
             request,

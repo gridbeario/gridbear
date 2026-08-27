@@ -47,6 +47,7 @@ async def playwright_settings(request: Request, _=Depends(require_login)):
     users_without_access = [u for u in all_users if u not in users_with_access]
 
     return templates.TemplateResponse(
+        request,
         "playwright.html",
         get_plugin_template_context(
             request,

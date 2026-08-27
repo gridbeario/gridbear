@@ -36,6 +36,7 @@ async def languages_page(request: Request, _=Depends(require_login)):
     saved = request.query_params.get("saved")
     error = request.query_params.get("error")
     return templates.TemplateResponse(
+        request,
         "languages.html",
         {
             "request": request,
