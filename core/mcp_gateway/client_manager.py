@@ -222,6 +222,20 @@ class MCPServerConnection:
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
+def _wire_field(model, wire_name: str, default=None):
+    """Read a field by the name it carries on the wire, not by its attribute.
+
+    The SDK renames fields between majors while keeping the protocol alias
+    stable — inputSchema became input_schema, isError became is_error — so
+    reading by attribute silently breaks on an upgrade while reading by alias
+    does not.
+    """
+    for attr, info in type(model).model_fields.items():
+        if (info.alias or attr) == wire_name:
+            return getattr(model, attr)
+    return default
+
+
 def _get_user_credentials(
     unified_id: str,
     connection_id: str,
@@ -709,7 +723,8 @@ class MCPClientManager:
                     )
 
                 result = await conn.session.call_tool(tool_name, normalized_args)
-                if result.isError:
+                is_error = bool(_wire_field(result, "isError", False))
+                if is_error:
                     logger.warning(
                         "MCP Gateway: tool %s/%s returned isError=True, content=%s",
                         server_name,
@@ -746,13 +761,13 @@ class MCPClientManager:
                     else:
                         content.append({"type": "text", "text": str(item)})
 
-                if result.isError:
+                if is_error:
                     cb.record_soft_failure()
                 else:
                     cb.record_success()
                 logger.info(
                     f"MCP Gateway: tool call {server_name}/{tool_name} "
-                    f"({len(content)} content blocks, isError={result.isError})"
+                    f"({len(content)} content blocks, isError={is_error})"
                 )
                 return content
 
@@ -952,7 +967,7 @@ class MCPClientManager:
                     {
                         "name": tool.name,
                         "description": tool.description or "",
-                        "inputSchema": tool.model_dump(by_alias=True)["inputSchema"],
+                        "inputSchema": _wire_field(tool, "inputSchema", {}),
                     }
                     for tool in response.tools
                 ]
