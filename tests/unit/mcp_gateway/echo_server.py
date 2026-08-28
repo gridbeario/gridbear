@@ -1,51 +1,29 @@
 """A minimal MCP server, spawned over stdio by the round-trip test.
 
-Deliberately built the way the plugin servers are — `Tool(inputSchema=...)`
-declared through `mcp.server.Server`, served by `stdio_server` — so a breaking
-change in the SDK surfaces here rather than in production.
+Built the way the plugin servers are — the ergonomic API, accepting whichever
+major is installed — so a breaking change in the SDK surfaces here rather than
+in production.
 """
 
 import asyncio
+from typing import Annotated
 
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from pydantic import Field
 
-ECHO_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "message": {"type": "string", "description": "text to send back"},
-    },
-    "required": ["message"],
-}
+try:  # mcp 2.x
+    from mcp.server.mcpserver import MCPServer as _McpServer
+except ImportError:  # mcp 1.x
+    from mcp.server.fastmcp import FastMCP as _McpServer
 
-server = Server("echo-server")
+mcp = _McpServer("echo-server")
 
 
-@server.list_tools()
-async def list_tools() -> list[Tool]:
-    return [
-        Tool(
-            name="echo",
-            description="Return the message that was passed in.",
-            inputSchema=ECHO_SCHEMA,
-        )
-    ]
-
-
-@server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    if name != "echo":
-        raise ValueError(f"unknown tool: {name}")
-    return [TextContent(type="text", text=arguments["message"])]
-
-
-async def main() -> None:
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream, write_stream, server.create_initialization_options()
-        )
+@mcp.tool(description="Return the message that was passed in.", structured_output=False)
+async def echo(
+    message: Annotated[str, Field(description="text to send back")],
+) -> str:
+    return message
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(mcp.run_stdio_async())
