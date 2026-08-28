@@ -31,6 +31,27 @@ def _jinja_translate(message: str) -> str:
 templates.env.globals["_"] = _jinja_translate
 
 
+def _user_agents(request) -> list[dict]:
+    """Agents the current user may reach.
+
+    A sidebar is rendered on every page but the agent list is only built by the
+    chat route, so any other page showed it as empty. Exposing it as a global
+    lets a template ask for it wherever it is drawn, without every route having
+    to carry it. Imported lazily: ui.routes.me imports this module.
+    """
+    try:
+        from ui.auth.session import session_manager
+        from ui.routes.me import _get_user_agents
+
+        user = session_manager.validate_session(request)
+        return _get_user_agents(user) if user else []
+    except Exception:
+        return []
+
+
+templates.env.globals["user_agents"] = _user_agents
+
+
 def _plugin_enabled(name: str) -> bool:
     """Template helper: is the given plugin installed and enabled?
 
