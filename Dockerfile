@@ -77,7 +77,14 @@ RUN ARCH=$(dpkg --print-architecture) \
 
 # Install Google Sheets MCP server + boto3 for S3 backup uploads
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system mcp-google-sheets boto3
+    uv pip install --system boto3
+
+# mcp-google-sheets imports mcp.server.fastmcp, which mcp 2.x removed. It is a
+# separate process, so it gets its own environment and its SDK version stays
+# independent of the one the app uses.
+RUN python -m venv /opt/mcp-google-sheets && \
+    /opt/mcp-google-sheets/bin/pip install --no-cache-dir \
+        "mcp-google-sheets" "mcp>=1.8.0,<2.0.0"
 
 COPY . .
 

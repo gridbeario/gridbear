@@ -97,3 +97,27 @@ async def test_cleanup_marks_the_connection_closed():
     await manager._cleanup_connection(conn)
     assert conn.connected is False
     assert conn.tools == []
+
+
+@pytest.mark.asyncio
+async def test_a_tool_call_through_the_gateway_returns_the_result():
+    """Route the call the way production does, not straight at the session.
+
+    The session-level test above passes even when the gateway's own wrapper is
+    broken: it reads `isError` off the result, and an SDK rename of that field
+    took every tool call down while listing kept working. Only a call that goes
+    through `call_tool` covers that.
+    """
+    manager = MCPClientManager()
+    manager._known_servers["echo"] = _echo_server_info()
+    try:
+        blocks = await asyncio.wait_for(
+            manager.call_tool("echo__echo", {"message": "through the gateway"}),
+            timeout=HANDSHAKE_TIMEOUT,
+        )
+        texts = [b.get("text") for b in blocks if b.get("type") == "text"]
+        assert texts == ["through the gateway"]
+    finally:
+        conn = manager._connections.get("echo")
+        if conn:
+            await manager._cleanup_connection(conn)

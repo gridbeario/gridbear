@@ -5,10 +5,18 @@ SA credentials managed by the google-sa plugin (vault key: svc:google-sa:credent
 """
 
 import json
+from pathlib import Path
 
 from config.logging_config import logger
 from core.interfaces.mcp_provider import BaseMCPProvider
 from ui.secrets_manager import secrets_manager
+
+# This server is a third-party package that imports mcp.server.fastmcp, a module
+# mcp 2.x removed. It runs as its own process, so the image gives it a private
+# virtualenv and its SDK version stops depending on ours. Falls back to PATH
+# where that venv does not exist, such as a developer machine.
+_ISOLATED_BIN = Path("/opt/mcp-google-sheets/bin/mcp-google-sheets")
+GSHEETS_COMMAND = str(_ISOLATED_BIN) if _ISOLATED_BIN.exists() else "mcp-google-sheets"
 
 SECRET_KEY = "svc:google-sa:credentials"
 
@@ -75,7 +83,7 @@ class GoogleSheetsProvider(BaseMCPProvider):
 
         return {
             "google-sheets": {
-                "command": "mcp-google-sheets",
+                "command": GSHEETS_COMMAND,
                 "args": [],
                 "env": env,
             }
@@ -93,7 +101,7 @@ class GoogleSheetsProvider(BaseMCPProvider):
             env["ENABLED_TOOLS"] = self.enabled_tools
 
         return {
-            "command": "mcp-google-sheets",
+            "command": GSHEETS_COMMAND,
             "args": [],
             "env": env,
         }

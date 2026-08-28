@@ -11,10 +11,11 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import httpx
 import msal
+from pydantic import Field
 
 # Launched as a bare script by provider.get_server_config, so the repo root is
 # not on sys.path. Add it before importing sibling plugin modules.
@@ -26,9 +27,13 @@ from plugins.ms365.extract import encode_sharing_url, extract_text
 
 # MCP server imports
 try:
-    from mcp.server import Server
-    from mcp.server.stdio import stdio_server
-    from mcp.types import TextContent, Tool
+    # The ergonomic server API is FastMCP on mcp 1.x and MCPServer on 2.x. They
+    # are identical for what this file uses, so accepting either lets the major
+    # be switched from pyproject alone. Drop this once the pin moves.
+    try:  # mcp 2.x
+        from mcp.server.mcpserver import MCPServer as _McpServer
+    except ImportError:  # mcp 1.x
+        from mcp.server.fastmcp import FastMCP as _McpServer
 except ImportError:
     print("MCP server library not installed", file=sys.stderr)
     sys.exit(1)
@@ -82,7 +87,7 @@ class MS365Server:
     """MCP server for Microsoft 365 operations."""
 
     def __init__(self):
-        self.server = Server("ms365-server")
+        self.mcp = _McpServer("ms365-server")
         self.http_client: httpx.AsyncClient | None = None
         self.access_token: str | None = token_info.get("access_token")
         self.refresh_token: str | None = token_info.get("refresh_token")
@@ -114,322 +119,351 @@ class MS365Server:
         self._setup_tools()
 
     def _setup_tools(self):
-        """Register MCP tools."""
+        """Register every tool with the SDK.
 
-        @self.server.list_tools()
-        async def list_tools() -> list[Tool]:
-            return [
-                # SharePoint tools
-                Tool(
-                    name="m365_list_sites",
-                    description="List accessible SharePoint sites",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "search": {
-                                "type": "string",
-                                "description": "Optional search query",
-                            },
-                        },
-                    },
-                ),
-                Tool(
-                    name="m365_get_site_by_url",
-                    description="Get SharePoint site info by URL. Use this for guest tenant access.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "site_url": {
-                                "type": "string",
-                                "description": "SharePoint site URL, e.g. https://contoso.sharepoint.com/sites/MySite",
-                            },
-                        },
-                        "required": ["site_url"],
-                    },
-                ),
-                Tool(
-                    name="m365_list_files",
-                    description="List files in a SharePoint folder",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "site_id": {
-                                "type": "string",
-                                "description": "SharePoint site ID",
-                            },
-                            "folder_path": {
-                                "type": "string",
-                                "description": "Folder path (default: root)",
-                                "default": "",
-                            },
-                        },
-                        "required": ["site_id"],
-                    },
-                ),
-                Tool(
-                    name="m365_read_file",
-                    description="Read file content from SharePoint",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "site_id": {
-                                "type": "string",
-                                "description": "SharePoint site ID",
-                            },
-                            "file_path": {
-                                "type": "string",
-                                "description": "Path to the file",
-                            },
-                        },
-                        "required": ["site_id", "file_path"],
-                    },
-                ),
-                Tool(
-                    name="m365_read_shared",
-                    description=(
-                        "Read a document SHARED WITH the user — by share link "
-                        "(from email) or by drive_id+item_id from m365_list_shared. "
-                        "Returns extracted text for Word/Excel/PDF."
-                    ),
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "sharing_url": {
-                                "type": "string",
-                                "description": "Share link URL (from an email/message)",
-                            },
-                            "drive_id": {
-                                "type": "string",
-                                "description": "Drive ID (from m365_list_shared)",
-                            },
-                            "item_id": {
-                                "type": "string",
-                                "description": "Item ID (from m365_list_shared)",
-                            },
-                        },
-                    },
-                ),
-                Tool(
-                    name="m365_list_shared",
-                    description=(
-                        "List documents shared WITH the user (Shared with me). "
-                        "Returns items with drive_id/item_id to pass to m365_read_shared."
-                    ),
-                    inputSchema={"type": "object", "properties": {}},
-                ),
-                Tool(
-                    name="m365_write_file",
-                    description="Write/upload file to SharePoint",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "site_id": {
-                                "type": "string",
-                                "description": "SharePoint site ID",
-                            },
-                            "file_path": {
-                                "type": "string",
-                                "description": "Path for the file",
-                            },
-                            "content": {
-                                "type": "string",
-                                "description": "File content",
-                            },
-                        },
-                        "required": ["site_id", "file_path", "content"],
-                    },
-                ),
-                Tool(
-                    name="m365_search_files",
-                    description="Search for files across SharePoint",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Search query",
-                            },
-                            "site_id": {
-                                "type": "string",
-                                "description": "Optional: limit to specific site",
-                            },
-                        },
-                        "required": ["query"],
-                    },
-                ),
-                # Planner tools
-                Tool(
-                    name="m365_list_groups",
-                    description="List Microsoft 365 groups the user is a member of",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {},
-                    },
-                ),
-                Tool(
-                    name="m365_list_plans",
-                    description="List Planner plans. Use list_all=true to get plans from all groups.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "group_id": {
-                                "type": "string",
-                                "description": "Optional: filter by specific group ID",
-                            },
-                            "list_all": {
-                                "type": "boolean",
-                                "description": "If true, list plans from ALL groups (slower but complete)",
-                                "default": False,
-                            },
-                        },
-                    },
-                ),
-                Tool(
-                    name="m365_get_plan_by_id",
-                    description="Get Planner plan details by ID. Use this for guest access to shared plans.",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "plan_id": {
-                                "type": "string",
-                                "description": "The Planner plan ID (from URL or shared link)",
-                            },
-                        },
-                        "required": ["plan_id"],
-                    },
-                ),
-                Tool(
-                    name="m365_list_tasks",
-                    description="List tasks in a Planner plan",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "plan_id": {
-                                "type": "string",
-                                "description": "Plan ID",
-                            },
-                            "bucket_id": {
-                                "type": "string",
-                                "description": "Optional: filter by bucket",
-                            },
-                        },
-                        "required": ["plan_id"],
-                    },
-                ),
-                Tool(
-                    name="m365_get_task",
-                    description="Get task details including description",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "task_id": {
-                                "type": "string",
-                                "description": "Task ID",
-                            },
-                        },
-                        "required": ["task_id"],
-                    },
-                ),
-                Tool(
-                    name="m365_create_task",
-                    description="Create a new Planner task",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "plan_id": {
-                                "type": "string",
-                                "description": "Plan ID",
-                            },
-                            "title": {
-                                "type": "string",
-                                "description": "Task title",
-                            },
-                            "bucket_id": {
-                                "type": "string",
-                                "description": "Optional: bucket ID",
-                            },
-                            "due_date": {
-                                "type": "string",
-                                "description": "Optional: due date (ISO format)",
-                            },
-                        },
-                        "required": ["plan_id", "title"],
-                    },
-                ),
-                Tool(
-                    name="m365_complete_task",
-                    description="Mark a task as complete",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "task_id": {
-                                "type": "string",
-                                "description": "Task ID",
-                            },
-                        },
-                        "required": ["task_id"],
-                    },
-                ),
-                # OneDrive tools
-                Tool(
-                    name="m365_list_drive_files",
-                    description="List files in OneDrive",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "folder_path": {
-                                "type": "string",
-                                "description": "Folder path (default: root)",
-                                "default": "",
-                            },
-                        },
-                    },
-                ),
-                Tool(
-                    name="m365_read_drive_file",
-                    description="Read file from OneDrive",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "file_path": {
-                                "type": "string",
-                                "description": "Path to the file",
-                            },
-                        },
-                        "required": ["file_path"],
-                    },
-                ),
-                Tool(
-                    name="m365_write_drive_file",
-                    description="Write file to OneDrive",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {
-                            "file_path": {
-                                "type": "string",
-                                "description": "Path for the file",
-                            },
-                            "content": {
-                                "type": "string",
-                                "description": "File content",
-                            },
-                        },
-                        "required": ["file_path", "content"],
-                    },
-                ),
-            ]
+        Schemas come from the signatures below, so the declared contract and
+        the arguments the implementation reads cannot drift apart.
+        """
+        self.mcp.add_tool(
+            self.m365_list_sites,
+            name="m365_list_sites",
+            description="List accessible SharePoint sites",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_get_site_by_url,
+            name="m365_get_site_by_url",
+            description="Get SharePoint site info by URL. Use this for guest tenant access.",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_list_files,
+            name="m365_list_files",
+            description="List files in a SharePoint folder",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_read_file,
+            name="m365_read_file",
+            description="Read file content from SharePoint",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_read_shared,
+            name="m365_read_shared",
+            description="Read a document SHARED WITH the user — by share link (from email) or by drive_id+item_id from m365_list_shared. Returns extracted text for Word/Excel/PDF.",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_list_shared,
+            name="m365_list_shared",
+            description="List documents shared WITH the user (Shared with me). Returns items with drive_id/item_id to pass to m365_read_shared.",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_write_file,
+            name="m365_write_file",
+            description="Write/upload file to SharePoint",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_search_files,
+            name="m365_search_files",
+            description="Search for files across SharePoint",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_list_groups,
+            name="m365_list_groups",
+            description="List Microsoft 365 groups the user is a member of",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_list_plans,
+            name="m365_list_plans",
+            description="List Planner plans. Use list_all=true to get plans from all groups.",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_get_plan_by_id,
+            name="m365_get_plan_by_id",
+            description="Get Planner plan details by ID. Use this for guest access to shared plans.",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_list_tasks,
+            name="m365_list_tasks",
+            description="List tasks in a Planner plan",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_get_task,
+            name="m365_get_task",
+            description="Get task details including description",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_create_task,
+            name="m365_create_task",
+            description="Create a new Planner task",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_complete_task,
+            name="m365_complete_task",
+            description="Mark a task as complete",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_list_drive_files,
+            name="m365_list_drive_files",
+            description="List files in OneDrive",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_read_drive_file,
+            name="m365_read_drive_file",
+            description="Read file from OneDrive",
+            structured_output=False,
+        )
+        self.mcp.add_tool(
+            self.m365_write_drive_file,
+            name="m365_write_drive_file",
+            description="Write file to OneDrive",
+            structured_output=False,
+        )
 
-        @self.server.call_tool()
-        async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-            try:
-                result = await self._call_tool_impl(name, arguments)
-                self._track_operation(name, arguments, result)
-                return [TextContent(type="text", text=json.dumps(result, indent=2))]
-            except Exception as e:
-                error_result = {"success": False, "error": str(e)}
-                return [
-                    TextContent(type="text", text=json.dumps(error_result, indent=2))
-                ]
+    async def _run_tool(self, name: str, args: dict) -> dict:
+        """Dispatch a tool, record the operation, and report failures as data.
+
+        Shared by every tool so tracking and error shape stay in one place.
+        """
+        try:
+            result = await self._call_tool_impl(name, args)
+            self._track_operation(name, args, result)
+            return result
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def m365_list_sites(
+        self,
+        search: Annotated[
+            str | None, Field(description="Optional search query")
+        ] = None,
+    ) -> dict:
+        """List accessible SharePoint sites"""
+        args = {"search": search}
+        return await self._run_tool(
+            "m365_list_sites", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_get_site_by_url(
+        self,
+        site_url: Annotated[
+            str,
+            Field(
+                description="SharePoint site URL, e.g. https://contoso.sharepoint.com/sites/MySite"
+            ),
+        ],
+    ) -> dict:
+        """Get SharePoint site info by URL. Use this for guest tenant access."""
+        args = {"site_url": site_url}
+        return await self._run_tool(
+            "m365_get_site_by_url", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_list_files(
+        self,
+        site_id: Annotated[str, Field(description="SharePoint site ID")],
+        folder_path: Annotated[
+            str | None, Field(description="Folder path (default: root)")
+        ] = None,
+    ) -> dict:
+        """List files in a SharePoint folder"""
+        args = {"site_id": site_id, "folder_path": folder_path}
+        return await self._run_tool(
+            "m365_list_files", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_read_file(
+        self,
+        site_id: Annotated[str, Field(description="SharePoint site ID")],
+        file_path: Annotated[str, Field(description="Path to the file")],
+    ) -> dict:
+        """Read file content from SharePoint"""
+        args = {"site_id": site_id, "file_path": file_path}
+        return await self._run_tool(
+            "m365_read_file", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_read_shared(
+        self,
+        sharing_url: Annotated[
+            str | None, Field(description="Share link URL (from an email/message)")
+        ] = None,
+        drive_id: Annotated[
+            str | None, Field(description="Drive ID (from m365_list_shared)")
+        ] = None,
+        item_id: Annotated[
+            str | None, Field(description="Item ID (from m365_list_shared)")
+        ] = None,
+    ) -> dict:
+        """Read a document SHARED WITH the user — by share link (from email) or by drive_id+item_id from m365_list_shared. Returns extracted text for Word/Excel/PDF."""
+        args = {"sharing_url": sharing_url, "drive_id": drive_id, "item_id": item_id}
+        return await self._run_tool(
+            "m365_read_shared", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_list_shared(self) -> dict:
+        """List documents shared WITH the user (Shared with me). Returns items with drive_id/item_id to pass to m365_read_shared."""
+        return await self._run_tool("m365_list_shared", {})
+
+    async def m365_write_file(
+        self,
+        site_id: Annotated[str, Field(description="SharePoint site ID")],
+        file_path: Annotated[str, Field(description="Path for the file")],
+        content: Annotated[str, Field(description="File content")],
+    ) -> dict:
+        """Write/upload file to SharePoint"""
+        args = {"site_id": site_id, "file_path": file_path, "content": content}
+        return await self._run_tool(
+            "m365_write_file", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_search_files(
+        self,
+        query: Annotated[str, Field(description="Search query")],
+        site_id: Annotated[
+            str | None, Field(description="Optional: limit to specific site")
+        ] = None,
+    ) -> dict:
+        """Search for files across SharePoint"""
+        args = {"query": query, "site_id": site_id}
+        return await self._run_tool(
+            "m365_search_files", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_list_groups(self) -> dict:
+        """List Microsoft 365 groups the user is a member of"""
+        return await self._run_tool("m365_list_groups", {})
+
+    async def m365_list_plans(
+        self,
+        group_id: Annotated[
+            str | None, Field(description="Optional: filter by specific group ID")
+        ] = None,
+        list_all: Annotated[
+            bool | None,
+            Field(
+                description="If true, list plans from ALL groups (slower but complete)"
+            ),
+        ] = None,
+    ) -> dict:
+        """List Planner plans. Use list_all=true to get plans from all groups."""
+        args = {"group_id": group_id, "list_all": list_all}
+        return await self._run_tool(
+            "m365_list_plans", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_get_plan_by_id(
+        self,
+        plan_id: Annotated[
+            str, Field(description="The Planner plan ID (from URL or shared link)")
+        ],
+    ) -> dict:
+        """Get Planner plan details by ID. Use this for guest access to shared plans."""
+        args = {"plan_id": plan_id}
+        return await self._run_tool(
+            "m365_get_plan_by_id", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_list_tasks(
+        self,
+        plan_id: Annotated[str, Field(description="Plan ID")],
+        bucket_id: Annotated[
+            str | None, Field(description="Optional: filter by bucket")
+        ] = None,
+    ) -> dict:
+        """List tasks in a Planner plan"""
+        args = {"plan_id": plan_id, "bucket_id": bucket_id}
+        return await self._run_tool(
+            "m365_list_tasks", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_get_task(
+        self,
+        task_id: Annotated[str, Field(description="Task ID")],
+    ) -> dict:
+        """Get task details including description"""
+        args = {"task_id": task_id}
+        return await self._run_tool(
+            "m365_get_task", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_create_task(
+        self,
+        plan_id: Annotated[str, Field(description="Plan ID")],
+        title: Annotated[str, Field(description="Task title")],
+        bucket_id: Annotated[
+            str | None, Field(description="Optional: bucket ID")
+        ] = None,
+        due_date: Annotated[
+            str | None, Field(description="Optional: due date (ISO format)")
+        ] = None,
+    ) -> dict:
+        """Create a new Planner task"""
+        args = {
+            "plan_id": plan_id,
+            "title": title,
+            "bucket_id": bucket_id,
+            "due_date": due_date,
+        }
+        return await self._run_tool(
+            "m365_create_task", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_complete_task(
+        self,
+        task_id: Annotated[str, Field(description="Task ID")],
+    ) -> dict:
+        """Mark a task as complete"""
+        args = {"task_id": task_id}
+        return await self._run_tool(
+            "m365_complete_task", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_list_drive_files(
+        self,
+        folder_path: Annotated[
+            str | None, Field(description="Folder path (default: root)")
+        ] = None,
+    ) -> dict:
+        """List files in OneDrive"""
+        args = {"folder_path": folder_path}
+        return await self._run_tool(
+            "m365_list_drive_files", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_read_drive_file(
+        self,
+        file_path: Annotated[str, Field(description="Path to the file")],
+    ) -> dict:
+        """Read file from OneDrive"""
+        args = {"file_path": file_path}
+        return await self._run_tool(
+            "m365_read_drive_file", {k: v for k, v in args.items() if v is not None}
+        )
+
+    async def m365_write_drive_file(
+        self,
+        file_path: Annotated[str, Field(description="Path for the file")],
+        content: Annotated[str, Field(description="File content")],
+    ) -> dict:
+        """Write file to OneDrive"""
+        args = {"file_path": file_path, "content": content}
+        return await self._run_tool(
+            "m365_write_drive_file", {k: v for k, v in args.items() if v is not None}
+        )
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client."""
@@ -1191,12 +1225,7 @@ class MS365Server:
 
     async def run(self):
         """Run the MCP server."""
-        async with stdio_server() as (read_stream, write_stream):
-            await self.server.run(
-                read_stream,
-                write_stream,
-                self.server.create_initialization_options(),
-            )
+        await self.mcp.run_stdio_async()
 
 
 async def main():
