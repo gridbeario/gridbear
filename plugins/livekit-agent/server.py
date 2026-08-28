@@ -16,8 +16,13 @@ import psycopg
 # LiveKit SDK
 from livekit import api
 
-# MCP SDK
-from mcp.server.fastmcp import FastMCP
+# MCP SDK — the ergonomic server API is FastMCP on mcp 1.x and MCPServer on 2.x.
+# The two are identical for what this file uses, so accepting either lets the
+# major be switched from pyproject alone. Drop this once the pin moves.
+try:  # mcp 2.x
+    from mcp.server.mcpserver import MCPServer as _McpServer
+except ImportError:  # mcp 1.x
+    from mcp.server.fastmcp import FastMCP as _McpServer
 from psycopg.rows import dict_row
 from pydantic import Field
 
@@ -112,7 +117,7 @@ def _get_all_sessions() -> list[dict]:
     return rows
 
 
-mcp = FastMCP("livekit-agent")
+mcp = _McpServer("livekit-agent")
 
 
 def _create_token(identity: str, name: str, room: str, is_admin: bool = False) -> str:
