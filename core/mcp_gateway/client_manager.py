@@ -943,11 +943,16 @@ class MCPClientManager:
             if conn.session:
                 await conn.session.initialize()
                 response = await conn.session.list_tools()
+                # Read the schema by its wire name rather than off the SDK
+                # attribute. The protocol field is part of the spec and stable;
+                # the Python attribute is not — mcp 2.0 renamed it to
+                # input_schema, which made this line raise AttributeError and
+                # took every server offline.
                 conn.tools = [
                     {
                         "name": tool.name,
                         "description": tool.description or "",
-                        "inputSchema": tool.inputSchema,
+                        "inputSchema": tool.model_dump(by_alias=True)["inputSchema"],
                     }
                     for tool in response.tools
                 ]
