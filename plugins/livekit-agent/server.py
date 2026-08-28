@@ -9,6 +9,7 @@ import os
 import secrets
 import time
 from datetime import datetime, timedelta
+from typing import Annotated
 
 import psycopg
 
@@ -16,10 +17,9 @@ import psycopg
 from livekit import api
 
 # MCP SDK
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import TextContent, Tool
+from mcp.server.fastmcp import FastMCP
 from psycopg.rows import dict_row
+from pydantic import Field
 
 # Configuration from environment
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "")
@@ -112,7 +112,7 @@ def _get_all_sessions() -> list[dict]:
     return rows
 
 
-server = Server("livekit-agent")
+mcp = FastMCP("livekit-agent")
 
 
 def _create_token(identity: str, name: str, room: str, is_admin: bool = False) -> str:
@@ -133,111 +133,48 @@ def _create_token(identity: str, name: str, room: str, is_admin: bool = False) -
     return token.to_jwt()
 
 
-@server.list_tools()
-async def list_tools() -> list[Tool]:
-    """List available tools."""
-    return [
-        Tool(
-            name="start_voice_call",
-            description=(
-                "Avvia una chiamata vocale real-time con l'utente corrente. "
-                "Restituisce l'URL della room LiveKit. "
-                "IMPORTANTE: Mostra l'URL esattamente come restituito, senza formattazione markdown, "
-                "senza grassetto, senza parentesi quadre. L'utente deve poterlo copiare e incollare."
-            ),
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "user_id": {
-                        "type": "string",
-                        "description": "ID dell'utente (es: telegram_123456, discord_username)",
-                    },
-                    "user_name": {
-                        "type": "string",
-                        "description": "Nome visualizzato dell'utente nella chiamata",
-                    },
-                    "caller_identity": {
-                        "type": "string",
-                        "description": (
-                            "Identità del chiamante nel formato platform:username "
-                            "(es: telegram:johndoe, discord:janedoe). "
-                            "Necessario per i permessi MCP durante la chiamata."
-                        ),
-                    },
-                },
-                "required": ["user_id"],
-            },
-        ),
-        Tool(
-            name="end_voice_call",
-            description="Termina una chiamata vocale attiva.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "room_name": {
-                        "type": "string",
-                        "description": "Nome della room da terminare",
-                    },
-                },
-                "required": ["room_name"],
-            },
-        ),
-        Tool(
-            name="list_active_calls",
-            description="Elenca tutte le chiamate vocali attive.",
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
-        Tool(
-            name="get_call_link",
-            description="Ottiene il link per una chiamata esistente.",
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "user_id": {
-                        "type": "string",
-                        "description": "ID dell'utente per cui cercare la chiamata",
-                    },
-                },
-                "required": ["user_id"],
-            },
-        ),
-    ]
-
-
-@server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    """Execute a tool."""
+def _config_error() -> str | None:
+    """Every tool here needs LiveKit credentials; report the same message once."""
     if not LIVEKIT_API_KEY or not LIVEKIT_API_SECRET or not LIVEKIT_WS_URL:
-        return [
-            TextContent(
-                type="text",
-                text="Errore: LiveKit non configurato. Mancano API_KEY, API_SECRET o WS_URL.",
+        return "Errore: LiveKit non configurato. Mancano API_KEY, API_SECRET o WS_URL."
+    return None
+
+
+@mcp.tool(
+    description=(
+        "Avvia una chiamata vocale real-time con l'utente corrente. "
+        "Restituisce l'URL della room LiveKit. "
+        "IMPORTANTE: Mostra l'URL esattamente come restituito, senza formattazione markdown, "
+        "senza grassetto, senza parentesi quadre. L'utente deve poterlo copiare e incollare."
+    ),
+    structured_output=False,
+)
+async def start_voice_call(
+    user_id: Annotated[
+        str,
+        Field(description="ID dell'utente (es: telegram_123456, discord_username)"),
+    ],
+    user_name: Annotated[
+        str | None,
+        Field(description="Nome visualizzato dell'utente nella chiamata"),
+    ] = None,
+    caller_identity: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Identità del chiamante nel formato platform:username "
+                "(es: telegram:johndoe, discord:janedoe). "
+                "Necessario per i permessi MCP durante la chiamata."
             )
-        ]
-
-    if name == "start_voice_call":
-        return await _start_voice_call(arguments)
-    elif name == "end_voice_call":
-        return await _end_voice_call(arguments)
-    elif name == "list_active_calls":
-        return await _list_active_calls(arguments)
-    elif name == "get_call_link":
-        return await _get_call_link(arguments)
-    else:
-        return [TextContent(type="text", text=f"Tool sconosciuto: {name}")]
-
-
-async def _start_voice_call(args: dict) -> list[TextContent]:
+        ),
+    ] = None,
+) -> str:
     """Start a voice call."""
-    user_id = args.get("user_id", "")
-    user_name = args.get("user_name", user_id)
-    caller_identity = args.get("caller_identity")
-
+    if err := _config_error():
+        return err
     if not user_id:
-        return [TextContent(type="text", text="Errore: user_id richiesto")]
+        return "Errore: user_id richiesto"
+    user_name = user_name or user_id
 
     # Check for existing call — reuse if token still valid (< 50 min)
     existing = _get_session_by_user(user_id)
@@ -248,8 +185,7 @@ async def _start_voice_call(args: dict) -> list[TextContent]:
         except Exception:
             age_minutes = 999
         if age_minutes < 50:
-            call_url = f"{BASE_URL}/plugin/livekit-agent/call/{existing['room_name']}"
-            return [TextContent(type="text", text=call_url)]
+            return f"{BASE_URL}/plugin/livekit-agent/call/{existing['room_name']}"
         # Token expired — clean up old session
         _delete_session(existing["room_name"])
 
@@ -279,26 +215,26 @@ async def _start_voice_call(args: dict) -> list[TextContent]:
             },
         )
     except Exception as e:
-        return [TextContent(type="text", text=f"Errore nel salvare la sessione: {e}")]
+        return f"Errore nel salvare la sessione: {e}"
 
     # Agent joins automatically via auto-dispatch when user connects to the room
-
     # Simple URL - admin will look up token from database
-    call_url = f"{BASE_URL}/plugin/livekit-agent/call/{room_name}"
-
-    return [TextContent(type="text", text=call_url)]
+    return f"{BASE_URL}/plugin/livekit-agent/call/{room_name}"
 
 
-async def _end_voice_call(args: dict) -> list[TextContent]:
+@mcp.tool(description="Termina una chiamata vocale attiva.", structured_output=False)
+async def end_voice_call(
+    room_name: Annotated[str, Field(description="Nome della room da terminare")],
+) -> str:
     """End a voice call."""
-    room_name = args.get("room_name", "")
-
+    if err := _config_error():
+        return err
     if not room_name:
-        return [TextContent(type="text", text="Errore: room_name richiesto")]
+        return "Errore: room_name richiesto"
 
     session = _get_session(room_name)
     if not session:
-        return [TextContent(type="text", text=f"Chiamata non trovata: {room_name}")]
+        return f"Chiamata non trovata: {room_name}"
 
     # Try to delete room via LiveKit API
     try:
@@ -312,14 +248,19 @@ async def _end_voice_call(args: dict) -> list[TextContent]:
     # Remove from database
     _delete_session(room_name)
 
-    return [TextContent(type="text", text=f"Chiamata terminata: {room_name}")]
+    return f"Chiamata terminata: {room_name}"
 
 
-async def _list_active_calls(args: dict) -> list[TextContent]:
+@mcp.tool(
+    description="Elenca tutte le chiamate vocali attive.", structured_output=False
+)
+async def list_active_calls() -> str:
     """List active calls."""
+    if err := _config_error():
+        return err
     sessions = _get_all_sessions()
     if not sessions:
-        return [TextContent(type="text", text="Nessuna chiamata attiva.")]
+        return "Nessuna chiamata attiva."
 
     lines = ["Chiamate attive:\n"]
     for session in sessions:
@@ -329,31 +270,29 @@ async def _list_active_calls(args: dict) -> list[TextContent]:
             f"  Creata: {session.get('created_at', 'N/A')}\n"
         )
 
-    return [TextContent(type="text", text="\n".join(lines))]
+    return "\n".join(lines)
 
 
-async def _get_call_link(args: dict) -> list[TextContent]:
+@mcp.tool(
+    description="Ottiene il link per una chiamata esistente.", structured_output=False
+)
+async def get_call_link(
+    user_id: Annotated[
+        str, Field(description="ID dell'utente per cui cercare la chiamata")
+    ],
+) -> str:
     """Get call link for a user."""
-    user_id = args.get("user_id", "")
-
+    if err := _config_error():
+        return err
     if not user_id:
-        return [TextContent(type="text", text="Errore: user_id richiesto")]
+        return "Errore: user_id richiesto"
 
     session = _get_session_by_user(user_id)
     if session:
-        call_url = f"{BASE_URL}/plugin/livekit-agent/call/{session['room_name']}"
-        return [TextContent(type="text", text=call_url)]
+        return f"{BASE_URL}/plugin/livekit-agent/call/{session['room_name']}"
 
-    return [TextContent(type="text", text=f"Nessuna chiamata attiva per {user_id}")]
-
-
-async def main():
-    """Run the MCP server."""
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(
-            read_stream, write_stream, server.create_initialization_options()
-        )
+    return f"Nessuna chiamata attiva per {user_id}"
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(mcp.run_stdio_async())
