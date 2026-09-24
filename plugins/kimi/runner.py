@@ -17,15 +17,16 @@ This iteration ships the API backend only. The Kimi CLI at 2.0.0 has none of
 the flags the original design assumed (--input-format, --config-file,
 --mcp-config, --work-dir) and needs Node >= 22 while the container runs Node
 20 — see docs/plans/kimi-cli-facts.md. The CLI backend and its config/pool
-machinery are out of scope for this task; run() still raises until the API
-backend lands.
+machinery are out of scope for this task; initialize() refuses to start on
+backend="cli" rather than letting run() fail mid-turn on it.
 """
 
+import asyncio
 import os
 import time
 
 from config.logging_config import logger
-from core.interfaces.runner import BaseRunner, RunnerResponse  # noqa: F401
+from core.interfaces.runner import BaseRunner, RunnerResponse
 
 # Module-level auth error tracking, read by this plugin's API routes.
 # Both run in the same gridbear process.
@@ -81,7 +82,7 @@ class KimiRunner(BaseRunner):
     def __init__(self, config: dict):
         super().__init__(config)
         self.backend = config.get("backend", "api")
-        self.model = config.get("model", os.getenv("KIMI_MODEL", "kimi-k2-turbo"))
+        self.model = config.get("model", os.getenv("KIMI_MODEL", "kimi-k2.6"))
         self.base_url = config.get(
             "base_url", os.getenv("KIMI_BASE_URL", "https://api.moonshot.ai/v1")
         )
@@ -128,6 +129,35 @@ class KimiRunner(BaseRunner):
             return True
         return any(p in text for p in self._AUTH_ERROR_PATTERNS)
 
+    def _notify_auth_failure(self) -> None:
+        """Fire-and-forget admin notification for a rejected Moonshot key.
+
+        Completes the tracking `get_auth_error_info()` already reads and
+        `/auth/status` (api/routes.py) already surfaces as the amber "Token
+        expired" badge: `_is_auth_error` recognises the failure, this
+        records when it happened. Same convention as
+        `plugins/claude/runner.py:_notify_auth_failure`, the CLI-path
+        original this plugin's module-level tracking was copied from.
+        """
+        global _last_auth_error_at
+        _last_auth_error_at = time.time()
+
+        from core.notifications_client import send_notification
+
+        asyncio.ensure_future(
+            send_notification(
+                category="runner_error",
+                severity="error",
+                title="Kimi: Moonshot authentication failed",
+                message=(
+                    "The Moonshot API rejected the configured API key. "
+                    "Update it from the plugin configuration page."
+                ),
+                source="kimi",
+                action_url="/plugins/kimi",
+            )
+        )
+
     @staticmethod
     def _refuse_placeholder_models(registry) -> None:
         """Refuse to start on model ids nobody confirmed.
@@ -146,8 +176,35 @@ class KimiRunner(BaseRunner):
                 f"before enabling this runner."
             )
 
+    def _refuse_cli_backend(self) -> None:
+        """Refuse to start on backend="cli": it is not implemented here.
+
+        The manifest still enumerates "cli" alongside "api" — the design
+        declares both backends, and a later iteration may add the CLI one —
+        so an operator can still pick it from the admin dropdown. Without
+        this gate that choice would surface as a bare `NotImplementedError`
+        mid-turn instead of a clear reason at startup. The two reasons named
+        below are both real and both independently fatal, captured in
+        docs/plans/kimi-cli-facts.md: the installed Kimi CLI (2.0.0) has
+        none of the flags this design needed (no --input-format,
+        --config-file, --mcp-config, or --work-dir), and it requires
+        Node >= 22 while this image runs Node 20.
+        """
+        if self.backend == "cli":
+            raise RuntimeError(
+                "Kimi backend='cli' is not implemented in this iteration: "
+                "the installed Kimi CLI (2.0.0) has none of the flags this "
+                "design needed (no --input-format, --config-file, "
+                "--mcp-config, or --work-dir), and it requires Node >= 22 "
+                "while this image runs Node 20. Set backend='api' from the "
+                "plugin page at /plugins/kimi — the only backend this build "
+                "serves."
+            )
+
     async def initialize(self) -> None:
-        """Seed the registry, then run the gates before any turn can start."""
+        """Refuse the unsupported backend, seed the registry, start the API backend."""
+        self._refuse_cli_backend()
+
         from core.registry import get_models_registry
 
         registry = get_models_registry()
@@ -155,6 +212,11 @@ class KimiRunner(BaseRunner):
             # Idempotent: writes only when data/models/kimi.json is absent.
             registry.seed_if_empty("kimi", self._DEFAULT_MODELS)
             self._refuse_placeholder_models(registry)
+
+        from .api_backend import KimiApiBackend
+
+        self._api_backend = KimiApiBackend(self.config)
+        await self._api_backend.initialize()
 
         logger.info(
             "Kimi runner initialized with model %s (backend=%s)",
@@ -217,5 +279,36 @@ class KimiRunner(BaseRunner):
         no_tools=False,
         **kwargs,
     ) -> RunnerResponse:
-        """Dispatch to the configured backend. Filled in by Tasks 11 and 14."""
-        raise NotImplementedError("backends land in Task 11 (CLI) and Task 14 (API)")
+        """Dispatch to the Moonshot API backend — the only backend this build ships.
+
+        `use_pool` is accepted for signature compatibility with the other
+        runners but has no effect here: pooling is a CLI-backend concept
+        (§Pooling), and that backend does not run in this iteration —
+        `initialize()` already refused to start on backend="cli".
+        """
+        if not self._api_backend:
+            raise RuntimeError(
+                "Kimi API backend not initialized — call initialize() first."
+            )
+
+        response = await self._api_backend.run(
+            prompt,
+            session_id=session_id,
+            progress_callback=progress_callback,
+            error_callback=error_callback,
+            tool_callback=tool_callback,
+            stream_callback=stream_callback,
+            agent_id=agent_id,
+            model=model,
+            no_tools=no_tools,
+            **kwargs,
+        )
+
+        # Notify admins on auth failure, same convention as
+        # plugins/claude/runner.py — no retry, a rejected key won't heal.
+        if response.is_error and self._is_auth_error(
+            response.raw.get("error_type"), response.text
+        ):
+            self._notify_auth_failure()
+
+        return response

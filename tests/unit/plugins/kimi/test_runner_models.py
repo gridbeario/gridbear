@@ -58,6 +58,27 @@ class TestAvailableModels:
         assert runner.available_models == [("ui-x", "Model X")]
 
 
+class TestDefaultModel:
+    """The constructor's fallback model id must be a real, shipped one.
+
+    This plugin has invented a wrong default twice already — "kimi-k2-turbo"
+    and "kimi-k2", both recorded as wrong in the comment above
+    _DEFAULT_MODELS — and a bare `KimiRunner({})` (or KIMI_MODEL unset)
+    fell back to one of them a third time via `os.getenv("KIMI_MODEL",
+    ...)`'s own default, undetected until it was run against the live
+    container. This couples that fallback to the shipped catalogue so a
+    fourth invented default fails a test instead of a live Moonshot call.
+    """
+
+    def test_the_bare_constructor_default_is_a_real_shipped_model(self, monkeypatch):
+        monkeypatch.delenv("KIMI_MODEL", raising=False)
+        from plugins.kimi.runner import KimiRunner
+
+        bare_runner = KimiRunner({})
+        shipped_ids = {m["id"] for m in KimiRunner._DEFAULT_MODELS}
+        assert bare_runner.model in shipped_ids
+
+
 class TestSeeding:
     @pytest.mark.asyncio
     async def test_initialize_seeds_the_registry_on_a_fresh_install(
@@ -152,3 +173,146 @@ class TestCapabilities:
         # in the registry, image blocks in the request builder, and a new
         # registry field — that last one is a core change for one runner.
         assert await runner.supports_vision() is False
+
+
+class TestBackendGate:
+    """initialize() must refuse backend="cli": the manifest still offers it
+    in the admin dropdown (§Runner interface declares both backends, and a
+    later iteration may add the CLI one), but this build has no CLI
+    machinery at all — run() would otherwise fail bare mid-turn on it.
+    """
+
+    @pytest.mark.asyncio
+    async def test_initialize_refuses_backend_cli(self, registry, monkeypatch):
+        monkeypatch.setattr("core.registry.get_models_registry", lambda: registry)
+        from plugins.kimi.runner import KimiRunner
+
+        cli_runner = KimiRunner({"backend": "cli"})
+        with pytest.raises(RuntimeError, match="backend='cli' is not implemented"):
+            await cli_runner.initialize()
+
+    @pytest.mark.asyncio
+    async def test_the_refusal_names_both_real_reasons(self, registry, monkeypatch):
+        # The two facts from docs/plans/kimi-cli-facts.md that make backend=cli
+        # a hard stop, not a "coming soon": missing CLI flags and the Node
+        # version floor. Both must be named, not just one.
+        monkeypatch.setattr("core.registry.get_models_registry", lambda: registry)
+        from plugins.kimi.runner import KimiRunner
+
+        cli_runner = KimiRunner({"backend": "cli"})
+        with pytest.raises(RuntimeError) as excinfo:
+            await cli_runner.initialize()
+        message = str(excinfo.value)
+        assert "--input-format" in message
+        assert "Node >= 22" in message
+        assert "backend='api'" in message
+
+    @pytest.mark.asyncio
+    async def test_backend_api_still_initializes_and_builds_the_backend(self, runner):
+        # `runner` fixture builds KimiRunner({}) — backend defaults to "api".
+        await runner.initialize()
+        try:
+            assert runner._api_backend is not None
+        finally:
+            await runner.shutdown()
+
+
+class TestRunDispatch:
+    """run() delegates to the Moonshot API backend and completes the
+    auth-failure tracking get_auth_error_info() already reads: `_is_auth_error`
+    recognises the failure fed from the backend's structured error_type,
+    `_notify_auth_failure` records when it happened.
+    """
+
+    @pytest.mark.asyncio
+    async def test_run_delegates_to_the_api_backend(self, runner, monkeypatch):
+        from core.interfaces.runner import RunnerResponse
+        from plugins.kimi import api_backend
+
+        class _FakeBackend:
+            def __init__(self, config):
+                self.calls = []
+
+            async def initialize(self):
+                pass
+
+            async def shutdown(self):
+                pass
+
+            async def run(self, prompt, **kwargs):
+                self.calls.append((prompt, kwargs))
+                return RunnerResponse(text="ok", is_error=False)
+
+        monkeypatch.setattr(api_backend, "KimiApiBackend", _FakeBackend)
+        await runner.initialize()
+        response = await runner.run("hi", agent_id="agent-a")
+        assert response.text == "ok"
+        assert runner._api_backend.calls[0][0] == "hi"
+        assert runner._api_backend.calls[0][1]["agent_id"] == "agent-a"
+
+    @pytest.mark.asyncio
+    async def test_run_before_initialize_fails_clearly(self, runner):
+        with pytest.raises(RuntimeError, match="not initialized"):
+            await runner.run("hi")
+
+    @pytest.mark.asyncio
+    async def test_an_auth_error_is_recorded_for_auth_status_to_read(
+        self, runner, monkeypatch
+    ):
+        import plugins.kimi.runner as kimi_runner_module
+        from core.interfaces.runner import RunnerResponse
+        from plugins.kimi import api_backend
+
+        class _FakeBackend:
+            def __init__(self, config):
+                pass
+
+            async def initialize(self):
+                pass
+
+            async def shutdown(self):
+                pass
+
+            async def run(self, prompt, **kwargs):
+                # The exact payload row 10 of kimi-cli-facts.md captured,
+                # fed the way the API backend actually feeds it: the
+                # structured `type` field in RunnerResponse.raw.
+                return RunnerResponse(
+                    text="Invalid Authentication",
+                    is_error=True,
+                    raw={"error_type": "invalid_authentication_error"},
+                )
+
+        monkeypatch.setattr(api_backend, "KimiApiBackend", _FakeBackend)
+        monkeypatch.setattr(kimi_runner_module, "_last_auth_error_at", 0.0)
+        await runner.initialize()
+        response = await runner.run("hi")
+        assert response.is_error is True
+        assert kimi_runner_module._last_auth_error_at > 0.0
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_error_does_not_trip_the_auth_flag(
+        self, runner, monkeypatch
+    ):
+        import plugins.kimi.runner as kimi_runner_module
+        from core.interfaces.runner import RunnerResponse
+        from plugins.kimi import api_backend
+
+        class _FakeBackend:
+            def __init__(self, config):
+                pass
+
+            async def initialize(self):
+                pass
+
+            async def shutdown(self):
+                pass
+
+            async def run(self, prompt, **kwargs):
+                return RunnerResponse(text="overloaded", is_error=True, raw={})
+
+        monkeypatch.setattr(api_backend, "KimiApiBackend", _FakeBackend)
+        monkeypatch.setattr(kimi_runner_module, "_last_auth_error_at", 0.0)
+        await runner.initialize()
+        await runner.run("hi")
+        assert kimi_runner_module._last_auth_error_at == 0.0

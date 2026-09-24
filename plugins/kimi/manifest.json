@@ -10,7 +10,7 @@
       "type": "string",
       "default": "api",
       "enum": ["cli", "api"],
-      "description": "Backend: cli (Kimi Code CLI, carries MCP tools and session continuity) or api (Moonshot Chat Completions)"
+      "description": "Backend: api (Moonshot Chat Completions, runs the tool loop — the only backend this build ships) or cli (Kimi Code CLI — not implemented in this iteration; the installed CLI lacks the required flags and needs Node >= 22)"
     },
     "moonshot_api_key": {
       "type": "secret",
@@ -60,13 +60,12 @@
   },
   "dependencies": [],
   "cli_meta": {
-    "cli_name": "Kimi Code CLI",
+    "cli_name": "Moonshot API Key",
     "auth_actions": [
-      {"type": "login", "label": "OAuth Login"},
       {"type": "token", "label": "API Key"}
     ],
     "token_endpoint": "api-key",
-    "token_hint": "Get your API key from <a href='https://platform.moonshot.ai/console/api-keys' target='_blank'>Moonshot Console</a>",
+    "token_hint": "Get your API key from <a href='https://platform.kimi.ai/console/api-keys' target='_blank'>Moonshot Console</a>",
     "token_placeholder": "sk-..."
   },
   "models_refreshable": true
