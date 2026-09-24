@@ -1,0 +1,73 @@
+{
+  "name": "kimi",
+  "version": "0.1.0",
+  "type": "runner",
+  "description": "Kimi (Moonshot AI) runner via Kimi Code CLI or Moonshot API",
+  "entry_point": "runner.py",
+  "class_name": "KimiRunner",
+  "config_schema": {
+    "backend": {
+      "type": "string",
+      "default": "api",
+      "enum": ["cli", "api"],
+      "description": "Backend: cli (Kimi Code CLI, carries MCP tools and session continuity) or api (Moonshot Chat Completions)"
+    },
+    "moonshot_api_key": {
+      "type": "secret",
+      "env": "MOONSHOT_API_KEY",
+      "description": "Moonshot API Key",
+      "required": false
+    },
+    "model": {
+      "type": "string",
+      "default": "kimi-k2-turbo",
+      "description": "Default model (selection via models registry, not restricted by enum)"
+    },
+    "base_url": {
+      "type": "string",
+      "default": "https://api.moonshot.ai/v1",
+      "description": "Moonshot serves api.moonshot.ai and api.moonshot.cn to different audiences"
+    },
+    "timeout": {
+      "type": "integer",
+      "default": 900,
+      "description": "Ceiling on a single turn, in seconds"
+    },
+    "max_retries": {
+      "type": "integer",
+      "default": 2,
+      "description": "Retries after the first attempt (2 = three attempts total)"
+    },
+    "allowed_tools": {
+      "type": "array",
+      "default": [],
+      "description": "CLI-internal tools to enable. Empty means none are enabled — not 'no restriction'. MCP tools are fenced by the gateway ACL instead"
+    },
+    "use_pool": {
+      "type": "boolean",
+      "default": false,
+      "description": "Keep CLI processes alive between turns"
+    },
+    "pool_max_processes": { "type": "integer", "default": 2 },
+    "pool_max_requests": { "type": "integer", "default": 100 },
+    "pool_idle_timeout": { "type": "integer", "default": 300 },
+    "pool_max_age": {
+      "type": "integer",
+      "default": 3600,
+      "description": "Maximum lifetime of a pooled process, enforced at handoff and at the reaper tick"
+    },
+    "notify_tool_use": { "type": "boolean", "default": true }
+  },
+  "dependencies": [],
+  "cli_meta": {
+    "cli_name": "Kimi Code CLI",
+    "auth_actions": [
+      {"type": "login", "label": "OAuth Login"},
+      {"type": "token", "label": "API Key"}
+    ],
+    "token_endpoint": "api-key",
+    "token_hint": "Get your API key from <a href='https://platform.moonshot.ai/console/api-keys' target='_blank'>Moonshot Console</a>",
+    "token_placeholder": "sk-..."
+  },
+  "models_refreshable": true
+}
