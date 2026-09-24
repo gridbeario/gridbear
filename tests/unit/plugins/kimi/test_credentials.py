@@ -61,46 +61,6 @@ class TestReadApiKey:
         assert read_api_key() == ""
 
 
-class TestResolveForTurn:
-    def test_configured_key_is_returned(self, vault):
-        from plugins.kimi.credentials import (
-            API_KEY_VAULT_KEY,
-            CredentialKind,
-            resolve_for_turn,
-        )
-
-        vault[API_KEY_VAULT_KEY] = "sk-abc123"
-        resolved = resolve_for_turn()
-
-        assert resolved.kind is CredentialKind.API_KEY
-        assert resolved.secret == "sk-abc123"
-        assert resolved.message is None
-
-    def test_no_key_configured_produces_no_credential_message(self, vault):
-        from plugins.kimi.credentials import MSG_NO_CREDENTIAL, resolve_for_turn
-
-        resolved = resolve_for_turn()
-
-        assert resolved.secret == ""
-        assert resolved.message == MSG_NO_CREDENTIAL
-
-    def test_whitespace_only_key_resolves_as_no_credential(self, vault):
-        """Consistent with TestReadApiKey: a whitespace-only stored value
-        must not slip through resolve_for_turn as a usable secret either.
-        """
-        from plugins.kimi.credentials import (
-            API_KEY_VAULT_KEY,
-            MSG_NO_CREDENTIAL,
-            resolve_for_turn,
-        )
-
-        vault[API_KEY_VAULT_KEY] = "   "
-        resolved = resolve_for_turn()
-
-        assert resolved.secret == ""
-        assert resolved.message == MSG_NO_CREDENTIAL
-
-
 class TestVaultKeyCoupling:
     def test_matches_manifest_env_name(self):
         """The coupling that breaks silently if either side is renamed:

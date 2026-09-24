@@ -411,9 +411,31 @@ class TestErrors:
 
     @pytest.mark.asyncio
     async def test_a_transient_failure_is_retried_three_times_in_total(
-        self, vault, transport
+        self, vault, transport, monkeypatch
     ):
+        from plugins.kimi import api_backend
         from plugins.kimi.api_backend import KimiApiBackend
+
+        # The real `await asyncio.sleep(2**attempt)` between retries costs
+        # this one test ~3s (1 + 2 = 3s of real backoff) — 81% of the whole
+        # suite's runtime. The retry *count* is what this test pins, not
+        # the backoff duration, so the sleep is collapsed to zero.
+        #
+        # `asyncio` here is the actual stdlib module (api_backend just
+        # imports it), and `backend.initialize()` below starts a background
+        # cleanup task (core/runners/session_manager.py) whose own loop
+        # also calls `asyncio.sleep` to throttle itself every 5 minutes. A
+        # no-op replacement with no real suspension point removes that
+        # task's only yield point, turning it into a tight busy loop that
+        # live-locks the event loop instead of speeding anything up.
+        # Delegating to the real `asyncio.sleep(0)` keeps a genuine
+        # cooperative yield while still collapsing the delay to ~nothing.
+        real_sleep = api_backend.asyncio.sleep
+
+        async def _fast_sleep(seconds):
+            await real_sleep(0)
+
+        monkeypatch.setattr(api_backend.asyncio, "sleep", _fast_sleep)
 
         for _ in range(3):
             transport.queue.append(({"error": {"message": "overloaded"}}, 503))
@@ -422,3 +444,195 @@ class TestErrors:
         response = await backend.run("hi")
         assert len(transport.requests) == 3, "max_retries=2 means three attempts"
         assert response.is_error is True
+
+
+class TestToolBudgetAndLoading:
+    """max_tools and tool_loading, forwarded from run()'s kwargs through to
+    ToolAdapter.list_tools — and truncated locally as a safety net when the
+    gateway doesn't honour the budget itself.
+
+    Before this fix, `_load_tools` called `list_tools()` with no arguments
+    at all: an agent configured tool_loading="search" got the full tool
+    block anyway (defeating the whole point of search mode), and an agent
+    configured max_tools=30 got everything the gateway had.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_budget_is_forwarded_and_honoured_as_a_safety_net(
+        self, vault, transport, monkeypatch
+    ):
+        from plugins.kimi import api_backend
+        from plugins.kimi.api_backend import KimiApiBackend
+
+        transport.queue.append((_completion(content="ok"), 200))
+
+        calls = []
+
+        class _Adapter:
+            async def initialize(self, agent_id, unified_id=None):
+                pass
+
+            async def list_tools(self, tool_budget=None, tool_loading="full"):
+                calls.append((tool_budget, tool_loading))
+                # A gateway that does NOT enforce the budget itself — this
+                # is exactly what the local safety-net truncation exists
+                # for: 5 tools come back against a budget of 2.
+                return [{"name": f"t{i}", "inputSchema": {}} for i in range(5)]
+
+            def mcp_to_kimi_tools(self, tools):
+                return [
+                    {"type": "function", "function": {"name": t["name"]}} for t in tools
+                ]
+
+            async def shutdown(self):
+                pass
+
+        monkeypatch.setattr(api_backend, "ToolAdapter", _Adapter)
+        backend = KimiApiBackend({})
+        await backend.initialize()
+        await backend.run("hi", agent_id="agent-a", max_tools=2)
+
+        assert calls == [(2, "full")]
+        assert len(transport.requests[0]["tools"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_tool_loading_is_forwarded_to_list_tools(
+        self, vault, transport, monkeypatch
+    ):
+        from plugins.kimi import api_backend
+        from plugins.kimi.api_backend import KimiApiBackend
+
+        transport.queue.append((_completion(content="ok"), 200))
+
+        calls = []
+
+        class _Adapter:
+            async def initialize(self, agent_id, unified_id=None):
+                pass
+
+            async def list_tools(self, tool_budget=None, tool_loading="full"):
+                calls.append((tool_budget, tool_loading))
+                return [{"name": "search_tools", "inputSchema": {}}]
+
+            def mcp_to_kimi_tools(self, tools):
+                return [
+                    {"type": "function", "function": {"name": t["name"]}} for t in tools
+                ]
+
+            async def shutdown(self):
+                pass
+
+        monkeypatch.setattr(api_backend, "ToolAdapter", _Adapter)
+        backend = KimiApiBackend({})
+        await backend.initialize()
+        await backend.run("hi", agent_id="agent-a", tool_loading="search")
+
+        assert calls == [(None, "search")]
+
+    @pytest.mark.asyncio
+    async def test_the_default_with_neither_kwarg_still_loads_tools_as_today(
+        self, vault, transport, monkeypatch
+    ):
+        """No max_tools, no tool_loading passed — the pre-existing default
+        behaviour must survive unchanged: tools still load, unbudgeted,
+        "full" loading.
+        """
+        from plugins.kimi import api_backend
+        from plugins.kimi.api_backend import KimiApiBackend
+
+        transport.queue.append((_completion(content="ok"), 200))
+
+        calls = []
+
+        class _Adapter:
+            async def initialize(self, agent_id, unified_id=None):
+                pass
+
+            async def list_tools(self, tool_budget=None, tool_loading="full"):
+                calls.append((tool_budget, tool_loading))
+                return [{"name": "t", "inputSchema": {}}]
+
+            def mcp_to_kimi_tools(self, tools):
+                return [
+                    {"type": "function", "function": {"name": t["name"]}} for t in tools
+                ]
+
+            async def shutdown(self):
+                pass
+
+        monkeypatch.setattr(api_backend, "ToolAdapter", _Adapter)
+        backend = KimiApiBackend({})
+        await backend.initialize()
+        await backend.run("hi", agent_id="agent-a")
+
+        assert calls == [(None, "full")]
+        assert len(transport.requests[0]["tools"]) == 1
+
+
+class TestModelIdResolution:
+    """The request's `model` field carries the api_id Moonshot bills under,
+    never the UI id the operator picks from the dropdown — even though
+    cost_for_turn keeps costing from the UI id (it resolves internally, and
+    resolving twice would be redundant, not wrong, but there is no reason
+    to). Before this fix, the UI id was posted verbatim: an operator-curated
+    alias whose api_id differs (e.g. "kimi-latest" -> "kimi-k2.7-code")
+    would 400 on every turn while the cost table priced it correctly.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_wire_body_carries_the_api_id_not_the_ui_id(
+        self, vault, transport, tmp_path, monkeypatch
+    ):
+        import core.registry  # noqa: F401 — force import before monkeypatch
+        from core.models_registry import ModelsRegistry
+        from plugins.kimi.api_backend import KimiApiBackend
+
+        registry = ModelsRegistry(base_dir=tmp_path)
+        registry.set_models(
+            "kimi",
+            [
+                {
+                    "id": "kimi-latest",
+                    "name": "Kimi Latest",
+                    "api_id": "kimi-k2.7-code",
+                }
+            ],
+        )
+        monkeypatch.setattr("core.registry.get_models_registry", lambda: registry)
+
+        transport.queue.append((_completion(content="ok"), 200))
+        backend = KimiApiBackend({"model": "kimi-latest"})
+        await backend.initialize()
+        await backend.run("hi")
+
+        assert transport.requests[0]["model"] == "kimi-k2.7-code"
+
+
+class TestFailedTurnNotCommitted:
+    """A turn that ends in an error must not leave its user message in
+    session history — otherwise the next successful turn re-posts every
+    failed prompt as a pile of stale, already-unanswered user messages.
+    """
+
+    @pytest.mark.asyncio
+    async def test_a_failed_turns_prompt_does_not_leak_into_the_next_request(
+        self, vault, transport
+    ):
+        from plugins.kimi.api_backend import KimiApiBackend
+
+        transport.queue.append(({"error": {"message": "invalid api key"}}, 401))
+        transport.queue.append((_completion(content="hi there"), 200))
+
+        backend = KimiApiBackend({})
+        await backend.initialize()
+
+        first = await backend.run("this one fails")
+        assert first.is_error is True
+
+        second = await backend.run("this one succeeds", session_id=first.session_id)
+        assert second.is_error is False
+
+        second_request_messages = transport.requests[1]["messages"]
+        contents = [m.get("content") for m in second_request_messages]
+        assert "this one fails" not in contents
+        assert contents == ["this one succeeds"]

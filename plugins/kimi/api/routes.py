@@ -14,9 +14,12 @@ There is no OAuth flow in this build. credentials.py ships only a Moonshot
 API key this iteration (see its module docstring for why the original
 device-code design was dropped), so /auth/login and /auth/code below fail
 closed rather than implementing a flow that has nothing to authenticate
-against. They still exist as routes — the manifest's cli_meta.auth_actions
-puts an "OAuth Login" button on the page regardless, and a missing route
-would turn that button into a 404 instead of a clear message.
+against. The manifest's cli_meta.auth_actions no longer declares a login
+action — this plugin's own a911d56 removed it — and
+runner_extras.html:137-139 only draws an "OAuth Login" button when one is
+present, so no page reaches these routes today. They stay anyway: a config
+edit or a stale bookmark hitting a 404 is worse than one that answers with
+a clear message, and fail-closed costs nothing to keep.
 """
 
 import os
@@ -34,12 +37,10 @@ from ..runner import get_auth_error_info
 
 router = APIRouter()
 
-# Same default KimiRunner.__init__ falls back to (plugins/kimi/runner.py).
-# A route never has the per-agent config dict a runner instance is built
-# with, so KimiRunner({}).base_url and this env lookup produce the exact
-# same value — reading it directly here skips constructing a runner object,
-# and the module-level import of config.settings that construction pulls
-# in, for a value that would be identical either way.
+# Same literal default KimiRunner.__init__ and KimiApiBackend.__init__
+# fall back to (runner.py, api_backend.py) — the last step of the
+# three-step order _base_url() below applies: plugin config, then
+# KIMI_BASE_URL, then this.
 _DEFAULT_BASE_URL = "https://api.moonshot.ai/v1"
 
 # The message row 3a of the design's OAuth section would have written, had
@@ -57,8 +58,24 @@ _NO_OAUTH_MESSAGE = (
 
 
 def _base_url() -> str:
-    """The Moonshot API base URL, read the same way KimiRunner reads it."""
-    return os.getenv("KIMI_BASE_URL", _DEFAULT_BASE_URL)
+    """The Moonshot API base URL: config, then env, then the built-in default.
+
+    An operator's base_url override on the plugin config page (e.g.
+    switching to api.moonshot.cn) must reach /health and /models/refresh
+    the same way it reaches turns — otherwise a working runner shows
+    "API returned 401" here because this route queried .ai with a
+    .cn-only key. `load_plugin_config` reads the DB directly, the same
+    helper `plugins/ollama/api/routes.py` uses for its own config re-read.
+    """
+    try:
+        from ui.plugin_helpers import load_plugin_config
+
+        cfg = load_plugin_config("kimi")
+    except Exception as exc:
+        logger.debug("Kimi _base_url config read failed: %s", exc)
+        cfg = {}
+    configured = cfg.get("base_url") if cfg else None
+    return configured or os.getenv("KIMI_BASE_URL", _DEFAULT_BASE_URL)
 
 
 class ModelEntry(BaseModel):
@@ -240,10 +257,11 @@ async def auth_logout(_auth: None = Depends(verify_internal_auth)):
 async def auth_login(_auth: None = Depends(verify_internal_auth)):
     """Fail closed: no OAuth flow ships in this build.
 
-    The route exists so the page's "OAuth Login" button (manifest
-    cli_meta.auth_actions still declares a login action) does not 404; see
-    the module docstring and _NO_OAUTH_MESSAGE for why the response points
-    at the API key instead of describing a CLI limitation.
+    Nothing on the page can reach this route today — cli_meta.auth_actions
+    no longer declares a login action, and runner_extras.html only draws
+    the "OAuth Login" button when one does. Kept anyway: a stale bookmark
+    or a future config edit hitting a missing route is worse than one that
+    answers clearly; see the module docstring and _NO_OAUTH_MESSAGE.
     """
     return api_error(400, _NO_OAUTH_MESSAGE, "unsupported")
 

@@ -217,3 +217,45 @@ class TestLogoutDeletesOnlyTheApiKey:
 
         asyncio.run(routes.auth_logout())
         assert deleted == [routes.API_KEY_VAULT_KEY]
+
+
+class TestBaseUrlResolution:
+    """_base_url() must agree with the order every other Moonshot caller in
+    this plugin uses (KimiRunner.__init__, KimiApiBackend.__init__): plugin
+    config first, then KIMI_BASE_URL, then the literal default. Before this
+    fix this route read only the env var — an operator's base_url override
+    on the plugin config page (e.g. switching to api.moonshot.cn) reached
+    turns but not /health or /models/refresh, so a working runner showed
+    "API returned 401" here.
+    """
+
+    def test_a_configured_base_url_wins_over_env_and_default(self, monkeypatch):
+        import ui.plugin_helpers as plugin_helpers
+        from plugins.kimi.api.routes import _base_url
+
+        monkeypatch.setattr(
+            plugin_helpers,
+            "load_plugin_config",
+            lambda name: {"base_url": "https://api.moonshot.cn/v1"},
+        )
+        monkeypatch.setenv("KIMI_BASE_URL", "https://env-only.example/v1")
+
+        assert _base_url() == "https://api.moonshot.cn/v1"
+
+    def test_env_wins_when_no_config_override_is_set(self, monkeypatch):
+        import ui.plugin_helpers as plugin_helpers
+        from plugins.kimi.api.routes import _base_url
+
+        monkeypatch.setattr(plugin_helpers, "load_plugin_config", lambda name: {})
+        monkeypatch.setenv("KIMI_BASE_URL", "https://env-only.example/v1")
+
+        assert _base_url() == "https://env-only.example/v1"
+
+    def test_the_literal_default_when_nothing_is_configured(self, monkeypatch):
+        import ui.plugin_helpers as plugin_helpers
+        from plugins.kimi.api.routes import _DEFAULT_BASE_URL, _base_url
+
+        monkeypatch.setattr(plugin_helpers, "load_plugin_config", lambda name: {})
+        monkeypatch.delenv("KIMI_BASE_URL", raising=False)
+
+        assert _base_url() == _DEFAULT_BASE_URL

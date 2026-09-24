@@ -4,22 +4,22 @@ Send the request; if the reply carries tool_calls, execute them through the
 MCP gateway, append the results to the conversation and repeat, until the
 model answers without tools.
 
-What this backend does not offer — CLI-side session continuity and
-token-level streaming — is why `cli` is the runner interface's stated
-default (that backend is not implemented in this iteration, see
-`runner.py`). Here the conversation is rebuilt on every call from the
-context `MessageProcessor` supplies, plus this plugin's own SessionManager.
+This backend offers neither CLI-side session continuity nor token-level
+streaming — Moonshot's Chat Completions API returns complete messages, not
+deltas. The conversation is rebuilt on every call from the context
+`MessageProcessor` supplies, plus this plugin's own SessionManager.
 """
 
 import asyncio
 import json
+import os
 
 import httpx
 
 from config.logging_config import logger
 from core.interfaces.runner import RunnerResponse
 
-from .cost_tracker import cost_for_turn
+from .cost_tracker import cost_for_turn, resolve_api_id
 from .credentials import MSG_NO_CREDENTIAL, read_api_key
 from .session_manager import SessionManager
 from .tool_adapter import ToolAdapter
@@ -57,7 +57,12 @@ class KimiApiBackend:
     def __init__(self, config: dict):
         self.config = config
         self.model = config.get("model", "kimi-k2.6")
-        self.base_url = config.get("base_url", "https://api.moonshot.ai/v1")
+        # Same three-step order KimiRunner.__init__ uses (runner.py) and
+        # api/routes.py's _base_url() mirrors, so an operator's base_url
+        # override reaches every path that talks to Moonshot the same way.
+        self.base_url = config.get(
+            "base_url", os.getenv("KIMI_BASE_URL", "https://api.moonshot.ai/v1")
+        )
         self.timeout = config.get("timeout", 900)
         self.max_retries = config.get("max_retries", 2)
         self.max_output_tokens = config.get("max_output_tokens", 8192)
@@ -97,19 +102,38 @@ class KimiApiBackend:
                 is_error=True,
             )
 
+        # cost_for_turn resolves the UI id to an api_id internally (see
+        # cost_tracker.py), so it must keep receiving effective_model — the
+        # UI id. The wire body is a separate concern: Moonshot only ever
+        # accepts the api_id it bills under, so the outgoing request uses
+        # request_model instead. Resolving twice would just waste a lookup,
+        # not double-convert, but there is no reason to.
         effective_model = model or self.model
+        request_model = resolve_api_id(effective_model)
+
         session = self._sessions.get_or_create(session_id, agent_id or "default")
-        self._sessions.append_turn(session.session_id, "user", prompt)
-        messages = list(self._sessions.get_history(session.session_id))
+        history = list(self._sessions.get_history(session.session_id))
+        # The user turn is NOT committed to the session here. It is included
+        # in this turn's outgoing messages either way, but only written to
+        # history once the turn actually succeeds below — otherwise a
+        # rejected key (or any other error exit) leaves an unanswered user
+        # message in history, and the next successful turn re-posts the
+        # whole backlog as consecutive user messages.
+        messages = history + [{"role": "user", "content": prompt}]
 
         tools = []
         if not no_tools and agent_id:
-            tools = await self._load_tools(agent_id, kwargs.get("unified_id"))
+            tools = await self._load_tools(
+                agent_id,
+                kwargs.get("unified_id"),
+                kwargs.get("max_tools"),
+                kwargs.get("tool_loading", "full"),
+            )
 
         total_usage = {"prompt_tokens": 0, "completion_tokens": 0}
 
         for _iteration in range(self.max_tool_iterations):
-            payload = await self._complete(api_key, effective_model, messages, tools)
+            payload = await self._complete(api_key, request_model, messages, tools)
             if payload is None:
                 return RunnerResponse(
                     text="The Moonshot API did not answer.",
@@ -140,7 +164,21 @@ class KimiApiBackend:
 
             if not tool_calls:
                 text = message.get("content") or ""
+                cost = cost_for_turn(
+                    effective_model,
+                    total_usage["prompt_tokens"],
+                    total_usage["completion_tokens"],
+                )
+                # Both turns committed together, and only here: this is the
+                # one path through the loop that ends in an actual answer.
+                self._sessions.append_turn(session.session_id, "user", prompt)
                 self._sessions.append_turn(session.session_id, "assistant", text)
+                self._sessions.update_usage(
+                    session.session_id,
+                    total_usage["prompt_tokens"],
+                    total_usage["completion_tokens"],
+                    cost,
+                )
                 if stream_callback and text:
                     # One call per complete message: Moonshot shows complete
                     # messages, so there are no deltas to forward.
@@ -148,11 +186,7 @@ class KimiApiBackend:
                 return RunnerResponse(
                     text=text,
                     session_id=session.session_id,
-                    cost_usd=cost_for_turn(
-                        effective_model,
-                        total_usage["prompt_tokens"],
-                        total_usage["completion_tokens"],
-                    ),
+                    cost_usd=cost,
                     is_error=False,
                     raw={"usage": total_usage},
                 )
@@ -180,12 +214,32 @@ class KimiApiBackend:
             raw={"usage": total_usage},
         )
 
-    async def _load_tools(self, agent_id, unified_id):
+    async def _load_tools(self, agent_id, unified_id, max_tools, tool_loading):
+        """Load MCP tools, honouring the agent's budget and loading mode.
+
+        `max_tools` and `tool_loading` come from the agent's YAML config,
+        forwarded by main.py through runner.run()'s **kwargs. Passing them
+        to list_tools lets the gateway apply both; the truncation below is
+        a safety net for when it doesn't, the same convention
+        plugins/openai and plugins/mistral use for their own tool budgets.
+        """
         try:
             if self._adapter is None:
                 self._adapter = ToolAdapter()
             await self._adapter.initialize(agent_id, unified_id)
-            mcp_tools = await self._adapter.list_tools()
+            mcp_tools = await self._adapter.list_tools(
+                tool_budget=max_tools,
+                tool_loading=tool_loading,
+            )
+            if max_tools and len(mcp_tools) > max_tools:
+                logger.warning(
+                    "Kimi: runner safety net for agent %s — MCP tools (%d) "
+                    "still exceed max_tools (%d) after the gateway budget",
+                    agent_id,
+                    len(mcp_tools),
+                    max_tools,
+                )
+                mcp_tools = mcp_tools[:max_tools]
             return self._adapter.mcp_to_kimi_tools(mcp_tools)
         except Exception as err:  # noqa: BLE001 — logged, turn continues
             logger.warning("Kimi: could not load MCP tools: %s", err)

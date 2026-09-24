@@ -2,7 +2,7 @@
   "name": "kimi",
   "version": "0.1.0",
   "type": "runner",
-  "description": "Kimi (Moonshot AI) runner via Kimi Code CLI or Moonshot API",
+  "description": "Kimi (Moonshot AI) runner via the Moonshot Chat Completions API",
   "entry_point": "runner.py",
   "class_name": "KimiRunner",
   "config_schema": {
@@ -38,23 +38,15 @@
       "default": 2,
       "description": "Retries after the first attempt (2 = three attempts total)"
     },
-    "allowed_tools": {
-      "type": "array",
-      "default": [],
-      "description": "CLI-internal tools to enable. Empty means none are enabled — not 'no restriction'. MCP tools are fenced by the gateway ACL instead"
-    },
-    "use_pool": {
-      "type": "boolean",
-      "default": false,
-      "description": "Keep CLI processes alive between turns"
-    },
-    "pool_max_processes": { "type": "integer", "default": 2 },
-    "pool_max_requests": { "type": "integer", "default": 100 },
-    "pool_idle_timeout": { "type": "integer", "default": 300 },
-    "pool_max_age": {
+    "max_output_tokens": {
       "type": "integer",
-      "default": 3600,
-      "description": "Maximum lifetime of a pooled process, enforced at handoff and at the reaper tick"
+      "default": 8192,
+      "description": "max_tokens sent on every Chat Completions request"
+    },
+    "max_tool_iterations": {
+      "type": "integer",
+      "default": 20,
+      "description": "Bound on the tool-call loop per turn, before it is interrupted"
     },
     "notify_tool_use": { "type": "boolean", "default": true }
   },

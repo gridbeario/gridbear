@@ -1,17 +1,15 @@
 """Kimi Runner Plugin.
 
-Executes Kimi (Moonshot AI) via the Kimi Code CLI or the Moonshot HTTP API.
-The backend is read from config and its module imported lazily, so an
-API-only deployment never loads the process pool.
+Executes Kimi (Moonshot AI) via the Moonshot HTTP API. The backend is read
+from config and its module imported lazily.
 
 MCP tool access goes through the MCP Gateway as it does for every other
-runner: the per-agent config file written by MCPTokenManager is passed to
-the CLI by path, never inline on a command line where any process in the
-container could read the bearer token from /proc/*/cmdline.
+runner: the API backend's ToolAdapter authenticates to the gateway over
+HTTP with the agent's MCP bearer token — the same mechanism the other
+API-backend runners (openai, mistral) use.
 
 This plugin imports nothing from other plugins. Where code is shared in
-spirit with plugins/claude it has been copied, and the divergences are
-enumerated in the design doc's Pooling section.
+spirit with plugins/claude it has been copied, not imported.
 
 This iteration ships the API backend only. The Kimi CLI at 2.0.0 has none of
 the flags the original design assumed (--input-format, --config-file,
@@ -88,34 +86,9 @@ class KimiRunner(BaseRunner):
         )
         self.timeout = config.get("timeout", 900)
         self.max_retries = config.get("max_retries", 2)
-        # CLI-internal tools. Empty means none are enabled, not unrestricted:
-        # the gateway ACL does not see the CLI's own built-in tools.
-        self.allowed_tools = config.get("allowed_tools", [])
-        self.use_pool = config.get("use_pool", False)
-        self.pool_max_processes = config.get("pool_max_processes", 2)
-        self.pool_max_requests = config.get("pool_max_requests", 100)
-        self.pool_idle_timeout = config.get("pool_idle_timeout", 300)
-        self.pool_max_age = config.get("pool_max_age", 3600)
         self.notify_tool_use = config.get("notify_tool_use", True)
 
-        from config.settings import ATTACHMENTS_DIR, BASE_DIR, VERBOSE_AGENT_LOG
-
-        self.working_dir = BASE_DIR
-        self.attachments_dir = ATTACHMENTS_DIR
-        self.verbose = VERBOSE_AGENT_LOG
-
-        self._pool = None
         self._api_backend = None
-        self._progress_callback = None
-        self._error_callback = None
-
-    def set_progress_callback(self, callback):
-        """Callback signature: async def callback(message: str)."""
-        self._progress_callback = callback
-
-    def set_error_callback(self, callback):
-        """Callback signature: async def callback(error_type: str, details: dict)."""
-        self._error_callback = callback
 
     def _is_auth_error(self, error_type: str | None, text: str) -> bool:
         """Recognise an authentication failure.
@@ -229,9 +202,6 @@ class KimiRunner(BaseRunner):
         if self._api_backend:
             await self._api_backend.shutdown()
             self._api_backend = None
-        if self._pool:
-            await self._pool.stop()
-            self._pool = None
 
     async def supports_tools(self) -> bool:
         """Both backends run the tool loop."""
