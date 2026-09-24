@@ -121,19 +121,15 @@ class TestVaultKeyCoupling:
 
 
 class TestMessages:
-    def test_messages_are_distinct_and_non_empty(self):
+    def test_message_is_non_empty(self):
         from plugins.kimi import credentials
 
         assert credentials.MSG_NO_CREDENTIAL
-        assert credentials.MSG_OAUTH_UNSUPPORTED
-        assert credentials.MSG_NO_CREDENTIAL != credentials.MSG_OAUTH_UNSUPPORTED
 
-    def test_messages_name_the_action_that_resolves_them(self):
+    def test_message_names_the_action_that_resolves_it(self):
         from plugins.kimi import credentials
 
-        # Both point at the same recovery action available in this build:
-        # setting the API key. MSG_NO_CREDENTIAL also names the OAuth
-        # connect action, unreachable in this build but still surfaced by
-        # the message (see plugins/kimi/credentials.py module docstring).
+        # Names both recovery actions available in this build: setting the
+        # API key, or (not implemented here, see module docstring) connecting
+        # the Kimi Code subscription from the plugin page.
         assert "MOONSHOT_API_KEY" in credentials.MSG_NO_CREDENTIAL
-        assert "MOONSHOT_API_KEY" in credentials.MSG_OAUTH_UNSUPPORTED

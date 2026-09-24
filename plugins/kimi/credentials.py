@@ -37,22 +37,23 @@ from enum import Enum
 # Getting it wrong means reading a key nobody wrote.
 API_KEY_VAULT_KEY = "MOONSHOT_API_KEY"
 
-# Copied verbatim from the design doc's message table. The other two rows
-# of that table (a too-short OAuth token, a rejected OAuth credential) are
-# deliberately not defined here — see the module docstring: both describe
-# OAuth states that cannot occur in this build, and a message for an
-# unreachable state is a string that can only ever be wrong.
-MSG_OAUTH_UNSUPPORTED = (
-    "OAuth is not supported by the installed Kimi CLI and no API key is "
-    "configured: set MOONSHOT_API_KEY"
-)
+# Copied verbatim from the design doc's message table. The other three rows
+# of that table are deliberately not defined here: a too-short OAuth token
+# and a rejected OAuth credential describe states that cannot occur in this
+# build, and "OAuth is not supported by the installed Kimi CLI" is not just
+# unreachable but false for this architecture — it implies a CLI is present
+# but limited, when no CLI backend ships here at all. A message for an
+# unreachable state is a string that can only ever be wrong; that one would
+# also send an operator to inspect a CLI installation that does not exist.
+# A future OAuth-capable iteration writes its own message against whatever
+# gate condition it actually adds.
 MSG_NO_CREDENTIAL = (
     "No Kimi credential configured: connect the Kimi Code subscription from "
     "the plugin page, or set MOONSHOT_API_KEY"
 )
 
 
-class CredentialKind(Enum):
+class CredentialKind(str, Enum):
     """What kind of credential `resolve_for_turn` produced.
 
     Kept as an enum rather than a bare string because `resolve_for_turn`
