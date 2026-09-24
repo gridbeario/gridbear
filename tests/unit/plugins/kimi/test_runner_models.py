@@ -63,20 +63,31 @@ class TestSeeding:
     async def test_initialize_seeds_the_registry_on_a_fresh_install(
         self, runner, registry
     ):
-        # _DEFAULT_MODELS ships with placeholder:true entries this task
-        # (row 9 of kimi-cli-facts.md is NOT CAPTURED yet), so initialize()
-        # both seeds the registry AND refuses to start on what it just
-        # seeded — the same gate that fires for placeholders already on
-        # disk in the test below.
         from plugins.kimi.runner import KimiRunner
 
         assert registry.get_models("kimi") == []
-        with pytest.raises(RuntimeError, match="data/models/kimi.json"):
-            await runner.initialize()
+        await runner.initialize()
         seeded = registry.get_models("kimi")
         assert len(seeded) == len(KimiRunner._DEFAULT_MODELS)
+        # The real catalogue, captured from GET /v1/models — not the
+        # provisional ids this constant shipped with.
+        assert {m["id"] for m in seeded} == {"kimi-k2.6", "kimi-k2.7-code"}
 
-    @pytest.mark.asyncio
+    async def test_no_shipped_model_is_still_a_placeholder(self, runner):
+        # The marker is the only thing separating a filled-in table from an
+        # invented one: invented ids and an invented price list agree with
+        # each other. Its absence is what lets initialize() start.
+        from plugins.kimi.runner import KimiRunner
+
+        marked = [m["id"] for m in KimiRunner._DEFAULT_MODELS if m.get("placeholder")]
+        assert marked == []
+
+    async def test_every_shipped_model_declares_both_identifier_spaces(self, runner):
+        from plugins.kimi.runner import KimiRunner
+
+        for model in KimiRunner._DEFAULT_MODELS:
+            assert set(model) >= {"id", "name", "api_id"}
+
     async def test_initialize_refuses_to_start_on_placeholder_ids(
         self, runner, registry
     ):
@@ -92,16 +103,30 @@ class TestSeeding:
 
 
 class TestAuthErrorRecognition:
-    # _AUTH_ERROR_TYPES/_AUTH_ERROR_PATTERNS ship empty this task (row 10 of
-    # kimi-cli-facts.md is NOT CAPTURED), so these tests assert the two-step
-    # lookup mechanism rather than real values, monkeypatching in test data
-    # where a structured type or a pattern is actually needed.
+    # The constants now carry row 10's captured values: Moonshot answers an
+    # invalid bearer with HTTP 401 and
+    # {"error": {"message": "Invalid Authentication",
+    #            "type": "invalid_authentication_error"}}
+    # These tests assert both the real values and the two-step lookup —
+    # structured field first, substring fallback — because the fallback is
+    # what carries recognition when no structured field reaches the caller.
+
+    def test_the_captured_values_are_the_ones_moonshot_actually_sends(self, runner):
+        assert type(runner)._AUTH_ERROR_TYPES == {"invalid_authentication_error"}
+        assert "Invalid Authentication" in type(runner)._AUTH_ERROR_PATTERNS
+
+    def test_a_real_moonshot_401_is_recognised(self, runner):
+        # The exact payload, fed the way the API backend will feed it.
+        assert runner._is_auth_error(
+            "invalid_authentication_error", "Invalid Authentication"
+        )
+
+    def test_it_is_recognised_from_the_text_alone(self, runner):
+        # No structured type survived to the caller — the substring branch
+        # has to carry it.
+        assert runner._is_auth_error(None, "upstream: Invalid Authentication")
 
     def test_an_ordinary_tool_failure_is_not_an_auth_error(self, runner):
-        # With both constants empty, nothing is recognised as an auth error
-        # — this is what the module ships with until row 10 is captured.
-        assert type(runner)._AUTH_ERROR_TYPES == set()
-        assert type(runner)._AUTH_ERROR_PATTERNS == ()
         assert not runner._is_auth_error("tool_error", "file not found")
 
     def test_a_structured_type_is_recognised(self, runner, monkeypatch):

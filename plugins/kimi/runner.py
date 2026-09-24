@@ -44,37 +44,37 @@ class KimiRunner(BaseRunner):
 
     name = "kimi"
 
-    # Row 10 of docs/plans/kimi-cli-facts.md is "NOT CAPTURED — needs a turn
-    # against a deliberately invalid credential", which needs a Moonshot API
-    # key this plugin cannot yet obtain (that key is entered through the
-    # plugin page this task creates, at /plugins/kimi). Left empty rather
-    # than guessed: an invented pattern that never matches is worse than an
-    # empty one that obviously does not. _is_auth_error's substring branch
-    # carries no recognition power until this is filled in from a real
-    # captured error.
-    _AUTH_ERROR_TYPES: set[str] = set()
-    _AUTH_ERROR_PATTERNS: tuple[str, ...] = ()
+    # Row 10 of docs/plans/kimi-cli-facts.md, captured 2026-09-24 from a real
+    # request with a deliberately invalid bearer token. Moonshot answers
+    # HTTP 401 with exactly:
+    #     {"error": {"message": "Invalid Authentication",
+    #                "type": "invalid_authentication_error"}}
+    # Not invented: the structured type is what _is_auth_error checks first,
+    # and the substring patterns are the fallback for the case where no
+    # structured field survives to the caller.
+    _AUTH_ERROR_TYPES: set[str] = {"invalid_authentication_error"}
+    _AUTH_ERROR_PATTERNS: tuple[str, ...] = (
+        "Invalid Authentication",
+        "invalid_authentication_error",
+    )
 
-    # Row 9 of docs/plans/kimi-cli-facts.md is also "NOT CAPTURED — needs a
-    # credential for GET /v1/models, or `kimi provider catalog`". These two
-    # entries are provisional, plausible-but-unconfirmed ids, not the row 9
-    # data. `api_id` is written explicitly even where it equals `id`,
-    # because the two spaces must stay separable. row 9 replaces this list
-    # verbatim once captured; until then `placeholder: True` is what makes
-    # `_refuse_placeholder_models()` (and therefore `initialize()`) refuse
-    # to let this runner start.
+    # Row 9 of docs/plans/kimi-cli-facts.md, captured 2026-09-24 from
+    # GET https://api.moonshot.ai/v1/models. The catalogue holds exactly
+    # these two. The provisional ids this constant shipped with
+    # ("kimi-k2-turbo", "kimi-k2") were both wrong, which is precisely what
+    # the `placeholder` marker existed to catch — it is gone now, and its
+    # absence is what lets initialize() start the runner.
+    #
+    # `api_id` coincides with `id` for both models today. It is written out
+    # anyway, because the two identifier spaces must stay separable: the day
+    # Moonshot ships a model whose billed name differs, a reader who finds
+    # the field missing has no way to know which space the id belongs to.
     _DEFAULT_MODELS: list[dict] = [
+        {"id": "kimi-k2.6", "name": "Kimi K2.6", "api_id": "kimi-k2.6"},
         {
-            "id": "kimi-k2-turbo",
-            "name": "Kimi K2 Turbo",
-            "api_id": "kimi-k2-turbo",
-            "placeholder": True,
-        },
-        {
-            "id": "kimi-k2",
-            "name": "Kimi K2",
-            "api_id": "kimi-k2",
-            "placeholder": True,
+            "id": "kimi-k2.7-code",
+            "name": "Kimi K2.7 Code",
+            "api_id": "kimi-k2.7-code",
         },
     ]
 

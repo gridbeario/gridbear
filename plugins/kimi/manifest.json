@@ -20,7 +20,7 @@
     },
     "model": {
       "type": "string",
-      "default": "kimi-k2-turbo",
+      "default": "kimi-k2.6",
       "description": "Default model (selection via models registry, not restricted by enum)"
     },
     "base_url": {
