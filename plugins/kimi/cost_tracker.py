@@ -31,8 +31,16 @@ KIMI_PRICING: list[tuple[str, float, float]] = [
 ]
 
 # One notification per api_id for the lifetime of the process, not one per
-# turn. Reset only by a restart, which is the right granularity: the fix is
-# an edit to this file or to data/models/kimi.json, and both need one.
+# turn. The ledger is keyed on the api_id, and the two repairs clear it
+# differently — worth knowing, because only one of them needs a restart.
+#
+# Editing KIMI_PRICING above is a module constant: the process must restart
+# before the new rate is read, and that restart also empties this set.
+# Correcting a mistyped api_id in data/models/kimi.json needs no restart —
+# ModelsRegistry._load re-reads the file on every call
+# (core/models_registry.py:41-48, no caching), so resolve_api_id picks the
+# fix up on the next turn, and the stale entry here does not block it
+# because the corrected api_id is a different string.
 _notified_unpriced: set[str] = set()
 
 
