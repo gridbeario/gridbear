@@ -129,7 +129,9 @@ class TestMessages:
     def test_message_names_the_action_that_resolves_it(self):
         from plugins.kimi import credentials
 
-        # Names both recovery actions available in this build: setting the
-        # API key, or (not implemented here, see module docstring) connecting
-        # the Kimi Code subscription from the plugin page.
+        # Names the one recovery action this build offers: entering the API
+        # key on the plugin page, which stores it under MOONSHOT_API_KEY.
+        # No second action is named — the OAuth login control the message
+        # used to point at was removed from cli_meta.auth_actions in this
+        # same task because it could only ever fail.
         assert "MOONSHOT_API_KEY" in credentials.MSG_NO_CREDENTIAL

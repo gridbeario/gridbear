@@ -37,19 +37,25 @@ from enum import Enum
 # Getting it wrong means reading a key nobody wrote.
 API_KEY_VAULT_KEY = "MOONSHOT_API_KEY"
 
-# Copied verbatim from the design doc's message table. The other three rows
-# of that table are deliberately not defined here: a too-short OAuth token
-# and a rejected OAuth credential describe states that cannot occur in this
-# build, and "OAuth is not supported by the installed Kimi CLI" is not just
-# unreachable but false for this architecture — it implies a CLI is present
-# but limited, when no CLI backend ships here at all. A message for an
-# unreachable state is a string that can only ever be wrong; that one would
-# also send an operator to inspect a CLI installation that does not exist.
-# A future OAuth-capable iteration writes its own message against whatever
-# gate condition it actually adds.
+# Originally copied verbatim from the design doc's message table, whose
+# wording named a "connect the Kimi Code subscription" login button — the
+# {"type": "login", "label": "OAuth Login"} entry `cli_meta.auth_actions`
+# carried before this same task removed it, since that button always posted
+# to a route that fails closed (no OAuth in this build). Rewritten below to
+# name only the control the plugin page actually draws: the API Key field.
+# The other three rows of the design doc's table are still deliberately not
+# defined here: a too-short OAuth token and a rejected OAuth credential
+# describe states that cannot occur in this build, and "OAuth is not
+# supported by the installed Kimi CLI" is not just unreachable but false for
+# this architecture — it implies a CLI is present but limited, when no CLI
+# backend ships here at all. A message for an unreachable state is a string
+# that can only ever be wrong; that one would also send an operator to
+# inspect a CLI installation that does not exist. A future OAuth-capable
+# iteration writes its own message against whatever gate condition it
+# actually adds.
 MSG_NO_CREDENTIAL = (
-    "No Kimi credential configured: connect the Kimi Code subscription from "
-    "the plugin page, or set MOONSHOT_API_KEY"
+    "No Kimi credential configured: enter your Moonshot API Key on the "
+    "plugin page (stored as MOONSHOT_API_KEY)."
 )
 
 

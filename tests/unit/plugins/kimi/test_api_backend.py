@@ -210,8 +210,169 @@ class TestToolLoop:
         backend = KimiApiBackend({"max_tool_iterations": 3})
         await backend.initialize()
         response = await backend.run("loop", agent_id="agent-a")
-        assert len(transport.requests) <= 4
+        # Exactly bounded: max_tool_iterations=3 must make exactly three
+        # completion calls, not "at most some slack" — an off-by-one
+        # running a fourth iteration should fail this.
+        assert len(transport.requests) == 3
         assert response.is_error is True
+
+    @pytest.mark.asyncio
+    async def test_a_failed_tool_is_surfaced_to_the_model_and_the_loop_continues(
+        self, vault, transport, monkeypatch
+    ):
+        """_run_tool's except branch: a failed call_tool must not crash the
+        turn, and the model has to actually see the failure to react to
+        it — not just "no exception". The mock's format_tool_result marks
+        the error the same way the real ToolAdapter does (an "Error: "
+        prefix), so the assertion can tell an error tool-message from an
+        ordinary one.
+        """
+        from plugins.kimi import api_backend
+        from plugins.kimi.api_backend import KimiApiBackend
+
+        transport.queue.append(
+            (
+                _completion(
+                    tool_calls=[
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "t", "arguments": "{}"},
+                        }
+                    ]
+                ),
+                200,
+            )
+        )
+        transport.queue.append((_completion(content="done"), 200))
+
+        class _FailingAdapter:
+            async def initialize(self, agent_id, unified_id=None):
+                pass
+
+            async def list_tools(self, *a, **k):
+                return [{"name": "t", "description": "", "inputSchema": {}}]
+
+            async def call_tool(self, name, arguments):
+                raise RuntimeError("MCP gateway unreachable")
+
+            def mcp_to_kimi_tools(self, tools):
+                return [
+                    {"type": "function", "function": {"name": t["name"]}} for t in tools
+                ]
+
+            def format_tool_result(self, tool_call_id, content, is_error=False):
+                text = content[0]["text"]
+                return {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": f"Error: {text}" if is_error else text,
+                }
+
+            async def shutdown(self):
+                pass
+
+        monkeypatch.setattr(api_backend, "ToolAdapter", _FailingAdapter)
+        backend = KimiApiBackend({})
+        await backend.initialize()
+        response = await backend.run("use a tool", agent_id="agent-a")
+
+        # The loop continued past the failure: a second completion was
+        # requested, and the turn ended clean because that one succeeded.
+        assert len(transport.requests) == 2
+        assert response.text == "done"
+        assert response.is_error is False
+
+        # The failure reached the model as a tool result, not a runner
+        # error — that's the property; "no exception" alone would miss it.
+        tool_messages = [
+            m for m in transport.requests[1]["messages"] if m.get("role") == "tool"
+        ]
+        assert tool_messages, "the failed call must still produce a tool message"
+        assert tool_messages[0]["content"].startswith("Error:")
+        assert "MCP gateway unreachable" in tool_messages[0]["content"]
+
+    @pytest.mark.asyncio
+    async def test_cost_accumulates_across_tool_loop_iterations(
+        self, vault, transport, monkeypatch
+    ):
+        """total_usage sums every iteration and feeds the final cost_usd.
+        A single-completion cost test (TestPlainCompletion) can't catch a
+        regression that drops intermediate usage — this needs at least two
+        completions, each carrying real usage, with a hand-checkable rate.
+        """
+        from plugins.kimi import api_backend, cost_tracker
+        from plugins.kimi.api_backend import KimiApiBackend
+
+        monkeypatch.setattr(
+            cost_tracker, "KIMI_PRICING", [("kimi-cost-loop", 1.0, 2.0)]
+        )
+
+        transport.queue.append(
+            (
+                _completion(
+                    tool_calls=[
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {"name": "t", "arguments": "{}"},
+                        }
+                    ],
+                    usage={"prompt_tokens": 500_000, "completion_tokens": 0},
+                ),
+                200,
+            )
+        )
+        transport.queue.append(
+            (
+                _completion(
+                    content="done",
+                    usage={
+                        "prompt_tokens": 500_000,
+                        "completion_tokens": 1_000_000,
+                    },
+                ),
+                200,
+            )
+        )
+
+        class _Adapter:
+            async def initialize(self, agent_id, unified_id=None):
+                pass
+
+            async def list_tools(self, *a, **k):
+                return [{"name": "t", "description": "", "inputSchema": {}}]
+
+            async def call_tool(self, name, arguments):
+                return [{"type": "text", "text": "tool output"}]
+
+            def mcp_to_kimi_tools(self, tools):
+                return [
+                    {"type": "function", "function": {"name": t["name"]}} for t in tools
+                ]
+
+            def format_tool_result(self, tool_call_id, content, is_error=False):
+                return {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": content[0]["text"],
+                }
+
+            async def shutdown(self):
+                pass
+
+        monkeypatch.setattr(api_backend, "ToolAdapter", _Adapter)
+        backend = KimiApiBackend({"model": "kimi-cost-loop"})
+        await backend.initialize()
+        response = await backend.run("use a tool", agent_id="agent-a")
+
+        assert response.text == "done"
+        assert len(transport.requests) == 2
+        # 1M prompt tokens total @ $1/M + 1M completion tokens total @
+        # $2/M = $3.00 — only correct if both iterations' usage was
+        # summed. Costing only the last completion would give $2.50;
+        # only the first, $0.50.
+        assert response.cost_usd == pytest.approx(3.0)
 
 
 class TestErrors:
@@ -224,6 +385,8 @@ class TestErrors:
         await backend.initialize()
         response = await backend.run("hi")
         assert response.is_error is True
+        # Not retried: a rejected credential will not heal in 200ms.
+        assert len(transport.requests) == 1
 
     @pytest.mark.asyncio
     async def test_no_api_key_fails_with_the_named_message(self, monkeypatch):

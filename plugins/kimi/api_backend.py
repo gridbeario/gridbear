@@ -202,7 +202,11 @@ class KimiApiBackend:
             return self._adapter.format_tool_result(call.get("id", ""), content)
         except Exception as err:  # noqa: BLE001 — surfaced to the model
             # A failed tool is a tool result, not a runner error: the model
-            # has to see it to react to it.
+            # has to see it to react to it. Also logged server-side — unlike
+            # _load_tools' failure, which only ever drops the tool list, an
+            # MCP Gateway outage here would otherwise leave no trace but the
+            # model-facing text.
+            logger.warning("Kimi: tool call %s failed: %s", name, err)
             return self._adapter.format_tool_result(
                 call.get("id", ""), [{"type": "text", "text": str(err)}], True
             )
