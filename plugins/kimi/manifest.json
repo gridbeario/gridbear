@@ -1,0 +1,64 @@
+{
+  "name": "kimi",
+  "version": "0.1.0",
+  "type": "runner",
+  "description": "Kimi (Moonshot AI) runner via the Moonshot Chat Completions API",
+  "entry_point": "runner.py",
+  "class_name": "KimiRunner",
+  "config_schema": {
+    "backend": {
+      "type": "string",
+      "default": "api",
+      "enum": ["cli", "api"],
+      "description": "Backend: api (Moonshot Chat Completions, runs the tool loop — the only backend this build ships) or cli (Kimi Code CLI — not implemented in this iteration; the installed CLI lacks the required flags and needs Node >= 22)"
+    },
+    "moonshot_api_key": {
+      "type": "secret",
+      "env": "MOONSHOT_API_KEY",
+      "description": "Moonshot API Key",
+      "required": false
+    },
+    "model": {
+      "type": "string",
+      "default": "kimi-k2.6",
+      "description": "Default model (selection via models registry, not restricted by enum)"
+    },
+    "base_url": {
+      "type": "string",
+      "default": "https://api.moonshot.ai/v1",
+      "description": "Moonshot serves api.moonshot.ai and api.moonshot.cn to different audiences"
+    },
+    "timeout": {
+      "type": "integer",
+      "default": 900,
+      "description": "Ceiling on a single turn, in seconds"
+    },
+    "max_retries": {
+      "type": "integer",
+      "default": 2,
+      "description": "Retries after the first attempt (2 = three attempts total)"
+    },
+    "max_output_tokens": {
+      "type": "integer",
+      "default": 8192,
+      "description": "max_tokens sent on every Chat Completions request"
+    },
+    "max_tool_iterations": {
+      "type": "integer",
+      "default": 20,
+      "description": "Bound on the tool-call loop per turn, before it is interrupted"
+    },
+    "notify_tool_use": { "type": "boolean", "default": true }
+  },
+  "dependencies": [],
+  "cli_meta": {
+    "cli_name": "Moonshot API Key",
+    "auth_actions": [
+      {"type": "token", "label": "API Key"}
+    ],
+    "token_endpoint": "api-key",
+    "token_hint": "Get your API key from <a href='https://platform.kimi.ai/console/api-keys' target='_blank'>Moonshot Console</a>",
+    "token_placeholder": "sk-..."
+  },
+  "models_refreshable": true
+}
