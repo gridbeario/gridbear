@@ -167,9 +167,17 @@ def _merge_refresh(
     demonstrably incomplete: verified against the live API on 2026-09-25, it
     lists exactly kimi-k2.6 and kimi-k2.7-code, while kimi-k2.7-code-highspeed
     and kimi-k3 both answer POST /v1/chat/completions with HTTP 200, are on
-    the official pricing page, and are priced in cost_tracker.py. A registry
-    entry the operator added because it works is not wrong data waiting to be
-    pruned on the next click — it is the catalogue that is short two rows. So
+    the official pricing page, and are priced in cost_tracker.py.
+
+    One correction to that evidence, recorded because the next reader will
+    otherwise trust a stronger claim than the facts support: the two ids were
+    missing while the Moonshot account was SUSPENDED for insufficient balance.
+    After it was recharged the same endpoint returned all four. So the
+    catalogue is not permanently short — it is VARIABLE, and it varied on
+    something that has nothing to do with which models exist. That is a weaker
+    premise and still enough: a refresh that deletes working, priced,
+    operator-added entries because a fluctuating endpoint omitted them this
+    minute is the wrong default. So
     an id present in `existing` but absent from `catalogue` is not fed
     through _resolve_api_ids at all: it is returned exactly as stored, api_id
     and name and any other field untouched, because nothing about it came
