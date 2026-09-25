@@ -26,8 +26,20 @@ from core.runners.cost_calculator import calculate_cost as _calculate_cost
 # changing a core module for one runner. The cache-miss rate is used
 # unconditionally, so a cached turn is over-costed, never under-costed.
 KIMI_PRICING: list[tuple[str, float, float]] = [
-    ("kimi-k2.6", 0.95, 4.00),
+    # ORDER IS LOAD-BEARING HERE, and this is not theoretical: calculate_cost
+    # matches by startswith, and "kimi-k2.7-code-highspeed" starts with
+    # "kimi-k2.7-code". Listed the other way round, highspeed matches the
+    # cheaper prefix and bills at HALF its real rate — silently, because a
+    # match did occur so the unpriced-model notification never fires. Found in
+    # a live registry on 2026-09-25, not imagined. Longest prefix first.
+    ("kimi-k2.7-code-highspeed", 1.90, 8.00),
     ("kimi-k2.7-code", 0.95, 4.00),
+    ("kimi-k2.6", 0.95, 4.00),
+    # kimi-k3 is absent from GET /v1/models but answers HTTP 200 — verified
+    # 2026-09-25 against the live API. Priced here because a model the
+    # dropdown cannot offer is still one an operator can type into an agent's
+    # config, and an unpriced model bills every turn at $0.00 in silence.
+    ("kimi-k3", 3.00, 15.00),
 ]
 
 # One notification per api_id for the lifetime of the process, not one per

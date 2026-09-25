@@ -49,6 +49,37 @@ class TestPriceTable:
         assert calculate_cost("no-such-model", 1_000_000, 1_000_000) == 0.0
 
 
+class TestPrefixOrdering:
+    """A longer id that starts with a shorter one must not inherit its rate.
+
+    Not hypothetical: a live registry on 2026-09-25 held
+    kimi-k2.7-code-highspeed, which starts with kimi-k2.7-code and costs
+    exactly double. calculate_cost matches by startswith, so with the shorter
+    prefix listed first the highspeed model billed at half its real rate —
+    and silently, because a match DID occur, so the unpriced-model
+    notification could never fire.
+    """
+
+    def test_every_prefix_that_extends_another_is_listed_first(self):
+        from plugins.kimi.cost_tracker import KIMI_PRICING
+
+        prefixes = [entry[0] for entry in KIMI_PRICING]
+        for index, prefix in enumerate(prefixes):
+            for later in prefixes[index + 1 :]:
+                assert not later.startswith(prefix), (
+                    f"{later!r} starts with {prefix!r} but is listed after it, "
+                    f"so it will be billed at {prefix!r}'s rate"
+                )
+
+    def test_the_highspeed_variant_bills_at_its_own_rate(self):
+        from plugins.kimi.cost_tracker import calculate_cost
+
+        standard = calculate_cost("kimi-k2.7-code", 1_000_000, 1_000_000)
+        highspeed = calculate_cost("kimi-k2.7-code-highspeed", 1_000_000, 1_000_000)
+        assert highspeed > standard, "highspeed inherited the cheaper prefix"
+        assert highspeed == pytest.approx(9.90)
+
+
 class TestIdResolution:
     def test_the_ui_id_is_resolved_to_the_billed_api_id(self, registry):
         from plugins.kimi.cost_tracker import resolve_api_id
