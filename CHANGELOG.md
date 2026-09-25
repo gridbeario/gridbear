@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-09-25
+
+### Added
+
+- **Kimi runner** (`kimi`): sixth runner, Moonshot AI through the Open Platform API. OpenAI-compatible Chat Completions with the MCP tool loop, honouring the agent's `max_tools` and `tool_loading` rather than loading every tool regardless. Costing is indexed by `api_id` and not the UI id, so a model whose billed name differs from its dropdown name is both priced correctly and addressed correctly on the wire. `initialize()` refuses to start while the model registry still holds unconfirmed placeholder ids, because invented ids and an invented price list agree with each other. Ships the eight endpoints the generic runner page addresses by plugin name, including a `POST /models/refresh` that preserves hand-curated `api_id` values, display names, and models the provider's catalogue omits — the catalogue was observed returning two ids on a suspended account and four after it was recharged.
+- **Kimi CLI backend declared and refused**: the design specified one, and installing Kimi Code 2.0.0 first established that it has none of the flags it would need (`--input-format`, `--config-file`, `--mcp-config`, `--work-dir`) and requires Node >= 22 where the image runs 20. `backend=cli` therefore fails at startup naming both reasons instead of dying mid-turn, and the enum value is kept so a later iteration can fill it in.
+
 ## [0.8.2] - 2026-04-23
 
 ### Security
