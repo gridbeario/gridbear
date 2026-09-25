@@ -90,9 +90,15 @@ class TestSeeding:
         await runner.initialize()
         seeded = registry.get_models("kimi")
         assert len(seeded) == len(KimiRunner._DEFAULT_MODELS)
-        # The real catalogue, captured from GET /v1/models — not the
-        # provisional ids this constant shipped with.
-        assert {m["id"] for m in seeded} == {"kimi-k2.6", "kimi-k2.7-code"}
+        # The two catalogue ids (captured from GET /v1/models) plus the two
+        # verified-but-uncatalogued ones — not the provisional ids this
+        # constant shipped with originally.
+        assert {m["id"] for m in seeded} == {
+            "kimi-k2.6",
+            "kimi-k2.7-code",
+            "kimi-k2.7-code-highspeed",
+            "kimi-k3",
+        }
 
     async def test_no_shipped_model_is_still_a_placeholder(self, runner):
         # The marker is the only thing separating a filled-in table from an

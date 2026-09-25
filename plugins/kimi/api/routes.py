@@ -88,7 +88,9 @@ class SetModelsRequest(BaseModel):
     models: list[ModelEntry]
 
 
-def _resolve_api_ids(catalogue: list[dict]) -> list[dict]:
+def _resolve_api_ids(
+    catalogue: list[dict], known: dict[str, dict] | None = None
+) -> list[dict]:
     """Give every catalogue entry an explicit api_id and name, no placeholder.
 
     Three rules, and none is what the four existing refresh routes do.
@@ -126,12 +128,17 @@ def _resolve_api_ids(catalogue: list[dict]) -> list[dict]:
     One registry read: get_models() is fetched once and both api_id and
     name are resolved from that same list, rather than calling
     get_model_map() — which performs its own get_models() read — and
-    get_models() again as a second round trip.
+    get_models() again as a second round trip. `known` lets a caller that
+    already read the registry for its own purposes (refresh_models, to
+    compute which ids the catalogue does not mention) hand that same list
+    in instead of forcing a second read; every existing caller passes
+    nothing and gets the read done here, unchanged.
     """
-    from core.registry import get_models_registry
+    if known is None:
+        from core.registry import get_models_registry
 
-    registry = get_models_registry()
-    known = {m["id"]: m for m in (registry.get_models("kimi") if registry else [])}
+        registry = get_models_registry()
+        known = {m["id"]: m for m in (registry.get_models("kimi") if registry else [])}
 
     resolved = []
     for entry in catalogue:
@@ -148,6 +155,40 @@ def _resolve_api_ids(catalogue: list[dict]) -> list[dict]:
 
         resolved.append({"id": model_id, "name": name, "api_id": api_id})
     return resolved
+
+
+def _merge_refresh(
+    catalogue: list[dict], existing: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    """Split a refresh into what the catalogue vouches for and what survives it.
+
+    set_models() overwrites data/models/kimi.json whole
+    (core/models_registry.py:62-74), and Moonshot's own GET /v1/models is
+    demonstrably incomplete: verified against the live API on 2026-09-25, it
+    lists exactly kimi-k2.6 and kimi-k2.7-code, while kimi-k2.7-code-highspeed
+    and kimi-k3 both answer POST /v1/chat/completions with HTTP 200, are on
+    the official pricing page, and are priced in cost_tracker.py. A registry
+    entry the operator added because it works is not wrong data waiting to be
+    pruned on the next click — it is the catalogue that is short two rows. So
+    an id present in `existing` but absent from `catalogue` is not fed
+    through _resolve_api_ids at all: it is returned exactly as stored, api_id
+    and name and any other field untouched, because nothing about it came
+    from this refresh.
+
+    Returns (refreshed, kept). `refreshed` is _resolve_api_ids(catalogue),
+    unchanged in behaviour — the api_id/name carry-forward rules and the
+    placeholder rule documented there still apply to every catalogue id.
+    `kept` is every entry from `existing` whose id `refreshed` does not
+    contain. The two lists are disjoint by id, so concatenating them (in
+    either order) accounts for every entry exactly once; refresh_models is
+    responsible for combining and logging them, since only it knows which
+    ids were which without re-deriving it.
+    """
+    known = {m["id"]: m for m in existing}
+    refreshed = _resolve_api_ids(catalogue, known=known)
+    refreshed_ids = {m["id"] for m in refreshed}
+    kept = [m for m in existing if m["id"] not in refreshed_ids]
+    return refreshed, kept
 
 
 @router.get(
@@ -189,7 +230,26 @@ async def set_models(
     "/models/refresh", response_model=ApiResponse, response_model_exclude_none=True
 )
 async def refresh_models(_auth: None = Depends(verify_internal_auth)):
-    """Refresh the model list from Moonshot's catalogue."""
+    """Refresh the model list from Moonshot's catalogue — a merge, not a wipe.
+
+    A plain `registry.set_models("kimi", _resolve_api_ids(catalogue))` is
+    what this route shipped with, and it is wrong: set_models() overwrites
+    the file whole, so any registry id the catalogue does not mention is
+    deleted, not just left un-updated. That is not hypothetical — a live
+    registry on 2026-09-25 held kimi-k2.7-code-highspeed and kimi-k3 next to
+    the two catalogue ids, both added by an operator after confirming they
+    work, and a production agent was configured on kimi-k3. One click here
+    would have dropped it from the registry and the dropdown, silently.
+
+    See _merge_refresh for why "keep what the catalogue omits" is correct
+    rather than merely convenient: Moonshot's /v1/models is demonstrably
+    incomplete, verified against the live API. The merged list is sorted by
+    id — one ordering rule for the whole file instead of "catalogue block,
+    then kept block" — because the JSON has no per-entry field recording
+    provenance, so the log line below is what tells an operator which ids
+    the provider vouched for and which are theirs; position in the list
+    was never going to carry that.
+    """
     api_key = read_api_key()
     if not api_key:
         return api_error(400, f"{API_KEY_VAULT_KEY} not configured", "missing_config")
@@ -215,10 +275,27 @@ async def refresh_models(_auth: None = Depends(verify_internal_auth)):
         ]
         catalogue.sort(key=lambda m: m["id"])
 
-        models = _resolve_api_ids(catalogue)
         registry = get_models_registry()
+        existing = registry.get_models("kimi") if registry else []
+        refreshed, kept = _merge_refresh(catalogue, existing)
+        models = sorted(refreshed + kept, key=lambda m: m["id"])
+
         if registry:
             registry.set_models("kimi", models, source="api")
+
+        if kept:
+            logger.info(
+                "Kimi models refresh: %d refreshed from the catalogue, %d "
+                "kept (not listed by the provider): %s",
+                len(refreshed),
+                len(kept),
+                ", ".join(sorted(m["id"] for m in kept)),
+            )
+        else:
+            logger.info(
+                "Kimi models refresh: %d refreshed from the catalogue, 0 kept",
+                len(refreshed),
+            )
         return api_ok(count=len(models))
     except Exception as err:
         logger.error("Kimi models refresh error: %s", err)

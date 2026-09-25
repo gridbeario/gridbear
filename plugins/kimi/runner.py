@@ -58,16 +58,27 @@ class KimiRunner(BaseRunner):
     )
 
     # Row 9 of docs/plans/kimi-cli-facts.md, captured 2026-09-24 from
-    # GET https://api.moonshot.ai/v1/models. The catalogue holds exactly
-    # these two. The provisional ids this constant shipped with
+    # GET https://api.moonshot.ai/v1/models, holds exactly the first two of
+    # these four. The provisional ids this constant shipped with
     # ("kimi-k2-turbo", "kimi-k2") were both wrong, which is precisely what
     # the `placeholder` marker existed to catch — it is gone now, and its
     # absence is what lets initialize() start the runner.
     #
-    # `api_id` coincides with `id` for both models today. It is written out
-    # anyway, because the two identifier spaces must stay separable: the day
-    # Moonshot ships a model whose billed name differs, a reader who finds
-    # the field missing has no way to know which space the id belongs to.
+    # kimi-k2.7-code-highspeed and kimi-k3 are absent from that catalogue —
+    # GET /v1/models still does not list them as of 2026-09-25 — but both
+    # answered POST /v1/chat/completions with HTTP 200 against the live API
+    # that same day, both are on the official pricing page, and both are
+    # priced in cost_tracker.py. A fresh install should offer every model
+    # that actually works and is priced, not only the ones the provider's
+    # own catalogue endpoint happens to list; this constant is seeded via
+    # seed_if_empty(), which never overwrites an existing file, so shipping
+    # all four only changes what a brand-new install starts with.
+    #
+    # `api_id` coincides with `id` for all four models today. It is written
+    # out anyway, because the two identifier spaces must stay separable: the
+    # day Moonshot ships a model whose billed name differs, a reader who
+    # finds the field missing has no way to know which space the id belongs
+    # to.
     _DEFAULT_MODELS: list[dict] = [
         {"id": "kimi-k2.6", "name": "Kimi K2.6", "api_id": "kimi-k2.6"},
         {
@@ -75,6 +86,12 @@ class KimiRunner(BaseRunner):
             "name": "Kimi K2.7 Code",
             "api_id": "kimi-k2.7-code",
         },
+        {
+            "id": "kimi-k2.7-code-highspeed",
+            "name": "Kimi K2.7 Code (High Speed)",
+            "api_id": "kimi-k2.7-code-highspeed",
+        },
+        {"id": "kimi-k3", "name": "Kimi K3", "api_id": "kimi-k3"},
     ]
 
     def __init__(self, config: dict):

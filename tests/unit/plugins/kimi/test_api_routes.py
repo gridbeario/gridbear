@@ -80,6 +80,149 @@ class TestApiIdResolution:
         assert calculate_cost(resolved[0]["api_id"], 1_000_000, 0) > 0
 
 
+class TestRefreshMerge:
+    """The defect this feature closes: set_models() overwrites
+    data/models/kimi.json whole, so an id the catalogue omits was deleted on
+    every refresh. A live registry on 2026-09-25 held two such ids
+    (kimi-k2.7-code-highspeed, kimi-k3), one of them configured on a
+    production agent — verified working against the live API and priced in
+    cost_tracker.py despite GET /v1/models never listing them.
+    """
+
+    def test_a_registry_entry_absent_from_the_catalogue_survives(self, registry):
+        from plugins.kimi.api.routes import _merge_refresh
+
+        registry.set_models(
+            "kimi",
+            [
+                {"id": "kimi-k2.6", "name": "Kimi K2.6", "api_id": "kimi-k2.6"},
+                {"id": "kimi-k3", "name": "Kimi K3", "api_id": "kimi-k3"},
+            ],
+        )
+        existing = registry.get_models("kimi")
+        catalogue = [{"id": "kimi-k2.6", "name": "kimi-k2.6"}]
+
+        _refreshed, kept = _merge_refresh(catalogue, existing)
+
+        assert kept == [{"id": "kimi-k3", "name": "Kimi K3", "api_id": "kimi-k3"}]
+
+    def test_a_catalogue_entry_still_updates_as_before(self, registry):
+        # The carry-forward rules must survive unchanged through the merge
+        # entry point, not just through _resolve_api_ids directly — the twin
+        # of TestApiIdResolution.test_a_hand_curated_mapping_survives_a_refresh.
+        from plugins.kimi.api.routes import _merge_refresh
+
+        registry.set_models(
+            "kimi", [{"id": "turbo", "name": "Turbo", "api_id": "billed-turbo"}]
+        )
+        existing = registry.get_models("kimi")
+        catalogue = [{"id": "turbo", "name": "turbo"}]
+
+        refreshed, kept = _merge_refresh(catalogue, existing)
+
+        assert refreshed == [{"id": "turbo", "name": "Turbo", "api_id": "billed-turbo"}]
+        assert kept == []
+
+    def test_every_entry_after_a_merge_has_an_api_id_and_no_placeholder(self, registry):
+        from plugins.kimi.api.routes import _merge_refresh
+
+        registry.set_models(
+            "kimi",
+            [
+                {
+                    "id": "kimi-k2.6",
+                    "name": "Kimi K2.6",
+                    "api_id": "kimi-k2.6",
+                    "placeholder": True,
+                },
+                {
+                    "id": "kimi-k2.7-code-highspeed",
+                    "name": "Kimi K2.7 Code (High Speed)",
+                    "api_id": "kimi-k2.7-code-highspeed",
+                },
+            ],
+        )
+        existing = registry.get_models("kimi")
+        catalogue = [{"id": "kimi-k2.6", "name": "kimi-k2.6"}]
+
+        refreshed, kept = _merge_refresh(catalogue, existing)
+        merged = refreshed + kept
+
+        assert len(merged) == 2
+        for entry in merged:
+            assert entry.get("api_id")
+            assert "placeholder" not in entry
+
+    def test_the_merge_is_disjoint_and_covers_every_id_exactly_once(self, registry):
+        from plugins.kimi.api.routes import _merge_refresh
+
+        registry.set_models(
+            "kimi",
+            [
+                {"id": "a", "name": "A", "api_id": "a"},
+                {"id": "b", "name": "B", "api_id": "b"},
+            ],
+        )
+        existing = registry.get_models("kimi")
+        catalogue = [{"id": "a", "name": "a"}, {"id": "c", "name": "c"}]
+
+        refreshed, kept = _merge_refresh(catalogue, existing)
+
+        assert {m["id"] for m in refreshed} == {"a", "c"}
+        assert {m["id"] for m in kept} == {"b"}
+
+
+class TestRefreshRouteEndToEnd:
+    """The route itself: httpx mocked, real registry, the whole merge wired
+    up — the gap none of the pure-function tests above can catch, since they
+    never touch set_models() or the log line an operator actually reads.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_route_keeps_an_uncatalogued_model_and_updates_a_listed_one(
+        self, registry, monkeypatch
+    ):
+        import httpx
+
+        from plugins.kimi.api import routes
+
+        registry.set_models(
+            "kimi",
+            [
+                {"id": "kimi-k2.6", "name": "Kimi K2.6", "api_id": "kimi-k2.6"},
+                {"id": "kimi-k3", "name": "Kimi K3", "api_id": "kimi-k3"},
+            ],
+        )
+        monkeypatch.setattr(routes, "read_api_key", lambda: "sk-test")
+
+        class _Response:
+            status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"data": [{"id": "kimi-k2.6"}]}
+
+        async def _get(self, url, **kwargs):
+            return _Response()
+
+        monkeypatch.setattr(httpx.AsyncClient, "get", _get)
+
+        result = await routes.refresh_models()
+
+        assert result.count == 2
+        stored = registry.get_models("kimi")
+        assert {m["id"] for m in stored} == {"kimi-k2.6", "kimi-k3"}
+        kept_entry = next(m for m in stored if m["id"] == "kimi-k3")
+        assert kept_entry["api_id"] == "kimi-k3"
+        assert kept_entry["name"] == "Kimi K3"
+        # The merged file is sorted by id — one ordering rule for the whole
+        # list, since provenance (catalogue vs kept) is carried by the log
+        # line, not by position.
+        assert [m["id"] for m in stored] == ["kimi-k2.6", "kimi-k3"]
+
+
 class TestThePlaceholderRule:
     def test_the_refresh_never_marks_an_entry_as_a_placeholder(self, registry):
         # The direction a copy gets wrong in reverse. Those ids come from
