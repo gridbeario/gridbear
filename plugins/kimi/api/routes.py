@@ -89,9 +89,9 @@ class SetModelsRequest(BaseModel):
 
 
 def _resolve_api_ids(catalogue: list[dict]) -> list[dict]:
-    """Give every catalogue entry an explicit api_id, and no placeholder.
+    """Give every catalogue entry an explicit api_id and name, no placeholder.
 
-    Two rules, and neither is what the four existing refresh routes do.
+    Three rules, and none is what the four existing refresh routes do.
 
     (1) api_id is written explicitly for every entry: carried forward from
     the registry for ids we recognise — so a mapping curated by hand from
@@ -102,27 +102,51 @@ def _resolve_api_ids(catalogue: list[dict]) -> list[dict]:
     silently, because calculate_cost returns 0.0 for an unknown model
     without raising.
 
-    (2) `placeholder` is NEVER written. These ids come from Moonshot and are
+    (2) name carries forward on the same principle, with one adjustment
+    api_id doesn't need: the catalogue built below (see refresh_models)
+    always sets a name — `m.get("display_name") or m["id"]` — because
+    Moonshot's /v1/models has no display_name field, so today that name
+    is always just the id echoed back. Treating that echo as "the
+    catalogue's name" and letting it win would silently discard curated
+    names — including the shipped seed names ("Kimi K2.6") — replacing
+    them with raw ids ("kimi-k2.6") on the very first click. So: a
+    catalogue name only counts as usable when it differs from the id
+    (i.e. a real display_name was actually present); for ids we already
+    know, the registry's curated name wins over an unusable echo, and
+    only a genuinely usable catalogue name is allowed to override it. For
+    ids never seen, there is no curated name to protect, so the
+    catalogue's name is used when usable, else the id.
+
+    (3) `placeholder` is NEVER written. These ids come from Moonshot and are
     real; marking them would hand the boot check a startup failure on
     correct data, produced by our own code on a correct operator action.
     set_models() stores dicts verbatim, so the key reaches disk if written
     — not writing it is the whole mechanism.
+
+    One registry read: get_models() is fetched once and both api_id and
+    name are resolved from that same list, rather than calling
+    get_model_map() — which performs its own get_models() read — and
+    get_models() again as a second round trip.
     """
     from core.registry import get_models_registry
 
     registry = get_models_registry()
-    known = registry.get_model_map("kimi") if registry else {}
+    known = {m["id"]: m for m in (registry.get_models("kimi") if registry else [])}
 
     resolved = []
     for entry in catalogue:
         model_id = entry["id"]
-        resolved.append(
-            {
-                "id": model_id,
-                "name": entry.get("name") or model_id,
-                "api_id": known.get(model_id, model_id),
-            }
-        )
+        existing = known.get(model_id)
+        api_id = existing.get("api_id", model_id) if existing else model_id
+
+        catalogue_name = entry.get("name")
+        catalogue_name_is_usable = bool(catalogue_name) and catalogue_name != model_id
+        if existing and not catalogue_name_is_usable:
+            name = existing.get("name") or model_id
+        else:
+            name = catalogue_name or model_id
+
+        resolved.append({"id": model_id, "name": name, "api_id": api_id})
     return resolved
 
 

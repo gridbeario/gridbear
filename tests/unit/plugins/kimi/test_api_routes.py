@@ -27,12 +27,36 @@ class TestApiIdResolution:
             {"id": "turbo", "name": "Turbo (new name)", "api_id": "billed-turbo"}
         ]
 
+    def test_a_curated_display_name_survives_a_refresh(self, registry):
+        # The name twin of test_a_hand_curated_mapping_survives_a_refresh:
+        # Moonshot's /v1/models has no display_name field, so refresh_models
+        # always echoes the id back as the catalogue "name" — carrying no
+        # usable name of its own — and that echo must not clobber a name
+        # curated by hand (or a shipped seed name) already in the registry.
+        from plugins.kimi.api.routes import _resolve_api_ids
+
+        registry.set_models(
+            "kimi", [{"id": "x", "name": "Curated Name", "api_id": "billed-x"}]
+        )
+        resolved = _resolve_api_ids([{"id": "x", "name": "x"}])
+        assert resolved == [{"id": "x", "name": "Curated Name", "api_id": "billed-x"}]
+
     def test_an_unseen_id_defaults_its_api_id_to_itself(self, registry):
         from plugins.kimi.api.routes import _resolve_api_ids
 
         registry.set_models("kimi", [])
         resolved = _resolve_api_ids([{"id": "brand-new", "name": "New"}])
         assert resolved[0]["api_id"] == "brand-new"
+
+    def test_a_brand_new_id_gets_a_sensible_name(self, registry):
+        from plugins.kimi.api.routes import _resolve_api_ids
+
+        registry.set_models("kimi", [])
+        resolved = _resolve_api_ids(
+            [{"id": "brand-new", "name": "New"}, {"id": "no-name", "name": "no-name"}]
+        )
+        assert resolved[0]["name"] == "New"
+        assert resolved[1]["name"] == "no-name"
 
     def test_every_entry_carries_an_api_id_after_a_refresh(self, registry):
         from plugins.kimi.api.routes import _resolve_api_ids
